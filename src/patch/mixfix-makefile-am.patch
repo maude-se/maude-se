@@ -1,0 +1,5 @@
+32c32,33
+< 	-I$(top_srcdir)/src/SMT
+---
+> 	-I$(top_srcdir)/src/SMT \
+>     -I$(top_srcdir)/src/extension

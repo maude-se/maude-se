@@ -1,0 +1,17 @@
+==========================================
+reduce in TEST : simplifyFormula(r(c(0)) === 0/1) .
+rewrites: 1
+result BooleanExpr: r(c(0)) === 0/1
+==========================================
+reduce in TEST : simplifyFormula(i(c(0)) === toInteger(0/1)) .
+rewrites: 1
+result BooleanExpr: i(c(0)) === (0).Integer
+==========================================
+reduce in TEST : simplifyFormula(toInteger(r(c(0)))) .
+rewrites: 1
+result IntegerExpr: toInteger(r(c(0)))
+==========================================
+reduce in TEST : simplifyFormula(toInteger(0/1 + 1/1 + 2/1)) .
+rewrites: 1
+result Integer: (3).Integer
+Bye.

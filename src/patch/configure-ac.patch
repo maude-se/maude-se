@@ -1,0 +1,24 @@
+83a84,104
+> #	Check to see if we should use Z3 for SMT solving.
+> #
+> AC_ARG_WITH(z3,
+> 	    AC_HELP_STRING([--with-z3],
+>                            [use Z3 SMT solver library [default=no]]),
+> 			   [WITH_Z3=$withval],
+> 			   [WITH_Z3=no])
+> if (test $WITH_Z3 = yes) then
+> #
+> #	Check if user set a particular Z3 library to use and if
+> #	not set default.
+> #
+>   AC_DEFINE([USE_Z3], [], [use Z3 SMT solver library])
+>   if (test -z "$Z3_LIB") then
+>     Z3_LIB="-lz3"
+>   fi
+>   AC_SUBST(Z3_LIB)
+> else
+>   Z3_LIB=""
+> fi
+> #
+411a433,433
+> 		 src/extension/Makefile

@@ -1,0 +1,4 @@
+63a64,66
+>   MACRO(SmtCheckerSymbol, SymbolType::SMT_CHECK_SYMBOL)
+>   MACRO(SimplifyFormulaSymbol, SymbolType::SMT_CHECK_SIMPLE_SYMBOL)
+>   MACRO(TacticApplySymbol, SymbolType::SMT_TACTIC_APPLY_SYMBOL)

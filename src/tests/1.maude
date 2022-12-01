@@ -1,0 +1,20 @@
+load smt
+load smt-check
+
+--- set verbose on .
+set show timing off .
+set show advisories off .
+fmod TEST is
+   pr NAT .
+   pr SMT-CHECK .
+   sorts S1 S2 S3 .
+   subsort RealExpr < S1 < S2 .
+   subsort RealExpr < S3 .
+   op c : Nat -> SMTVarId .  
+endfm
+
+--- sort error test case
+red simplifyFormula(r(c(0)) === 0/1) .
+red simplifyFormula(i(c(0)) === toInteger(0/1)) .
+red simplifyFormula(toInteger(r(c(0)))) .
+red simplifyFormula(toInteger(0/1 + 1/1 + 2/1)) .

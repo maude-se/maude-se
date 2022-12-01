@@ -1,0 +1,7 @@
+189a190,195
+>     case SymbolType::SMT_CHECK_SYMBOL:
+>         return new SmtCheckerSymbol(name, nrArgs);
+>     case SymbolType::SMT_CHECK_SIMPLE_SYMBOL:
+>         return new SimplifyFormulaSymbol(name, nrArgs);
+>     case SymbolType::SMT_TACTIC_APPLY_SYMBOL:
+>         return new TacticApplySymbol(name, nrArgs);

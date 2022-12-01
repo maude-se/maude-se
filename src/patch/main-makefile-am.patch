@@ -1,0 +1,12 @@
+32c32,33
+< 	-I$(top_srcdir)/src/Mixfix
+---
+> 	-I$(top_srcdir)/src/Mixfix \
+> 	-I$(top_srcdir)/src/extension
+56a58
+> 	../extension/libextension.a \
+64c66,67
+< 	$(LIBSIGSEGV_LIB)
+---
+> 	$(LIBSIGSEGV_LIB) \
+> 	$(Z3_LIB)

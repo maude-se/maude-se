@@ -1,0 +1,6 @@
+168a169,172
+> #include "smtManager.hh"
+> #include "smtCheckSymbol.hh"
+> #include "simplifyFormulaSymbol.hh"
+> #include "tacticApplySymbol.hh"
+>

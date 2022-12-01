@@ -1,0 +1,9 @@
+.build/
+3rd_party/
+.idea/
+.deps/
+Makefile
+*.in
+*.out
+.DS_Store
+Maude/
