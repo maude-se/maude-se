@@ -1,7 +1,7 @@
 ==========================================
-reduce in TEST : simplifyFormula(r(c(0)) === 0/1) .
+reduce in TEST : simplifyFormula(i(c(0)) === (0).Integer) .
 rewrites: 1
-result BooleanExpr: r(c(0)) === 0/1
+result BooleanExpr: i(c(0)) === (0).Integer
 ==========================================
 reduce in TEST : simplifyFormula(i(c(0)) === toInteger(0/1)) .
 rewrites: 1
@@ -14,4 +14,113 @@ result IntegerExpr: toInteger(r(c(0)))
 reduce in TEST : simplifyFormula(toInteger(0/1 + 1/1 + 2/1)) .
 rewrites: 1
 result Integer: (3).Integer
+==========================================
+reduce in TEST : simplifyFormula((1).Integer * (2).Integer * (3).Integer) .
+rewrites: 1
+result Integer: (6).Integer
+==========================================
+reduce in TEST : simplifyFormula((1).Integer * toInteger(2/1) * (3).Integer) .
+rewrites: 1
+result Integer: (6).Integer
+==========================================
+reduce in TEST : simplifyFormula((1).Integer * (2).Integer + (3).Integer) .
+rewrites: 1
+result Integer: (5).Integer
+==========================================
+reduce in TEST : simplifyFormula((1).Integer * toInteger(2/1) + (3).Integer) .
+rewrites: 1
+result Integer: (5).Integer
+==========================================
+reduce in TEST : simplifyFormula((1).Integer > (1).Integer) .
+rewrites: 1
+result Boolean: (false).Boolean
+==========================================
+reduce in TEST : simplifyFormula((1).Integer >= (1).Integer) .
+rewrites: 1
+result Boolean: (true).Boolean
+==========================================
+reduce in TEST : simplifyFormula(3 div 1) .
+rewrites: 1
+result Integer: (3).Integer
+==========================================
+reduce in TEST : simplifyFormula(3 div 2) .
+rewrites: 1
+result Integer: (1).Integer
+==========================================
+reduce in TEST : simplifyFormula(3 div (1 + 2)) .
+rewrites: 1
+result Integer: (1).Integer
+==========================================
+reduce in TEST : simplifyFormula(3 mod 1) .
+rewrites: 1
+result Integer: (0).Integer
+==========================================
+reduce in TEST : simplifyFormula(3 mod 2) .
+rewrites: 1
+result Integer: (1).Integer
+==========================================
+reduce in TEST : simplifyFormula(3 mod 3) .
+rewrites: 1
+result Integer: (0).Integer
+==========================================
+reduce in TEST : simplifyFormula(b(c(0)) === (true).Boolean) .
+rewrites: 1
+result BooleanVar: b(c(0))
+==========================================
+reduce in TEST : simplifyFormula(b(c(0)) === (false).Boolean) .
+rewrites: 1
+result BooleanExpr: not b(c(0))
+==========================================
+reduce in TEST : simplifyFormula(b(c(0)) =/== (false).Boolean) .
+rewrites: 1
+result BooleanVar: b(c(0))
+==========================================
+reduce in TEST : simplifyFormula(b(c(0)) =/== (true).Boolean) .
+rewrites: 1
+result BooleanExpr: not b(c(0))
+==========================================
+reduce in TEST : simplifyFormula(b(c(1))) .
+rewrites: 1
+result BooleanVar: b(c(1))
+==========================================
+reduce in TEST : simplifyFormula(r(c(0)) === 1/1) .
+rewrites: 1
+result BooleanExpr: r(c(0)) === 1/1
+==========================================
+reduce in TEST : simplifyFormula(r(c(1)) === 1/1 + 1/1) .
+rewrites: 1
+result BooleanExpr: r(c(1)) === 2/1
+==========================================
+reduce in TEST : simplifyFormula(r(c(1)) === 1/1 * 1/1 * 1/3) .
+rewrites: 1
+result BooleanExpr: r(c(1)) === 1/3
+==========================================
+reduce in TEST : simplifyFormula(1/12 > 1/12) .
+rewrites: 1
+result Boolean: (false).Boolean
+==========================================
+reduce in TEST : simplifyFormula(1/12 >= 1/12) .
+rewrites: 1
+result Boolean: (true).Boolean
+==========================================
+reduce in TEST : simplifyFormula((1/1 - 1/1) / 2/1) .
+rewrites: 1
+result Real: 0/1
+==========================================
+reduce in TEST : simplifyFormula(2/1 / 3/1) .
+rewrites: 1
+result Real: 2/3
+==========================================
+reduce in TEST : simplifyFormula(i(c(0)) === (0).Integer ? (1).Integer : (
+    0).Integer) .
+rewrites: 1
+result IntegerExpr: i(c(0)) === (0).Integer ? (1).Integer : (0).Integer
+==========================================
+reduce in TEST : simplifyFormula((true).Boolean ? (1).Integer : (0).Integer) .
+rewrites: 1
+result Integer: (1).Integer
+==========================================
+reduce in TEST : simplifyFormula((true).Boolean ? 1/1 + 1/1 : 0/1) .
+rewrites: 1
+result Real: 2/1
 Bye.

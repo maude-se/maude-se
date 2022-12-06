@@ -1,0 +1,85 @@
+==========================================
+reduce in TEST : smtCheck(i(c(0)) === (0).Integer, true) .
+rewrites: 1
+result SmtCheckResult: {i(c(0)) |-> (0).Integer}
+==========================================
+reduce in TEST : smtCheck(i(c(0)) === toInteger(0/1), true) .
+rewrites: 1
+result SmtCheckResult: {i(c(0)) |-> (0).Integer}
+==========================================
+reduce in TEST : smtCheck(i(c(0)) === toInteger(r(c(0))) and i(c(0)) === (
+    3).Integer, true) .
+rewrites: 1
+result SmtCheckResult: {(i(c(0)) |-> (3).Integer),r(c(0)) |-> 3/1}
+==========================================
+reduce in TEST : smtCheck((2).Integer <= toInteger(0/1 + 1/1 + 2/1), true) .
+rewrites: 1
+result SmtCheckResult: {empty}
+==========================================
+reduce in TEST : smtCheck((2).Integer > toInteger(0/1 + 1/1 + 2/1), true) .
+rewrites: 1
+result Bool: (false).Bool
+==========================================
+reduce in TEST : smtCheck(b(c(0)) === (true).Boolean, true) .
+rewrites: 1
+result SmtCheckResult: {b(c(0)) |-> (true).Boolean}
+==========================================
+reduce in TEST : smtCheck(b(c(0)) === (false).Boolean, true) .
+rewrites: 1
+result SmtCheckResult: {b(c(0)) |-> (false).Boolean}
+==========================================
+reduce in TEST : smtCheck(b(c(0)) =/== (false).Boolean, true) .
+rewrites: 1
+result SmtCheckResult: {b(c(0)) |-> (true).Boolean}
+==========================================
+reduce in TEST : smtCheck(b(c(0)) =/== (true).Boolean, true) .
+rewrites: 1
+result SmtCheckResult: {b(c(0)) |-> (false).Boolean}
+==========================================
+reduce in TEST : smtCheck(b(c(1)), true) .
+rewrites: 1
+result SmtCheckResult: {b(c(1)) |-> (true).Boolean}
+==========================================
+reduce in TEST : smtCheck(b(c(1)) and b(c(2)), true) .
+rewrites: 1
+result SmtCheckResult: {(b(c(1)) |-> (true).Boolean),b(c(2)) |-> (
+    true).Boolean}
+==========================================
+reduce in TEST : smtCheck(r(c(0)) === 1/1, true) .
+rewrites: 1
+result SmtCheckResult: {r(c(0)) |-> 1/1}
+==========================================
+reduce in TEST : smtCheck(r(c(0)) =/== 1/1) .
+rewrites: 2
+result Bool: (true).Bool
+==========================================
+reduce in TEST : smtCheck(r(c(1)) === 1/1 + 1/1, true) .
+rewrites: 1
+result SmtCheckResult: {r(c(1)) |-> 2/1}
+==========================================
+reduce in TEST : smtCheck(b(c(1)) and (r(c(0)) > 1/2 and i(c(0)) < (
+    0).Integer)) .
+rewrites: 2
+result Bool: (true).Bool
+==========================================
+reduce in TEST : smtCheck(b(c(1)) === i(c(0)) === (0).Integer and b(c(1)) === (
+    true).Boolean, true) .
+rewrites: 1
+result SmtCheckResult: {(i(c(0)) |-> (0).Integer),b(c(1)) |-> (true).Boolean}
+==========================================
+reduce in TEST : i(c(0)) > (0).Integer ? (1).Integer : (0).Integer .
+rewrites: 0
+result IntegerExpr: i(c(0)) > (0).Integer ? (1).Integer : (0).Integer
+==========================================
+reduce in TEST : b(c(0)) ? (true).Boolean : b(c(1)) .
+rewrites: 0
+result BooleanExpr: b(c(0)) ? (true).Boolean : b(c(1))
+==========================================
+reduce in TEST : r(c(0)) <= 1/3 ? r(c(0)) + 1/2 : r(c(0)) .
+rewrites: 0
+result RealExpr: r(c(0)) <= 1/3 ? r(c(0)) + 1/2 : r(c(0))
+==========================================
+reduce in TEST : smtCheck(true ? r(c(0)) === 1/2 : b(c(0))) .
+rewrites: 2
+result Bool: (true).Bool
+Bye.

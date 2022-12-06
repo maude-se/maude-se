@@ -1,0 +1,41 @@
+load smt
+load smt-check
+
+--- set verbose on .
+set show timing off .
+set show advisories off .
+fmod TEST is
+   pr NAT .
+   pr SMT-CHECK .
+   op c : Nat -> SMTVarId .  
+endfm
+
+--- IntegerExpr
+red smtCheck(i(c(0)) === 0, true) .
+red smtCheck(i(c(0)) === toInteger(0/1), true) .
+red smtCheck(i(c(0)) === toInteger(r(c(0))) and i(c(0)) === 3, true) .
+red smtCheck(2 <= toInteger(0/1 + 1/1 + 2/1), true) .
+red smtCheck(2 > toInteger(0/1 + 1/1 + 2/1), true) .
+
+--- BooleanExpr
+red smtCheck(b(c(0)) === true, true) .
+red smtCheck(b(c(0)) === false, true) .
+red smtCheck(b(c(0)) =/== false, true) .
+red smtCheck(b(c(0)) =/== true, true) .
+red smtCheck(b(c(1)), true) .
+red smtCheck(b(c(1)) and b(c(2)), true) .
+
+--- RealExpr
+red smtCheck(r(c(0)) === 1/1, true) .
+red smtCheck(r(c(0)) =/== 1/1) .
+red smtCheck(r(c(1)) === 1/1 + 1/1, true) .
+
+--- Mixed
+red smtCheck(b(c(1)) and (r(c(0)) > 1/2 and i(c(0)) < 0)) .
+red smtCheck(b(c(1)) === (i(c(0)) === 0) and b(c(1)) === true, true) .
+
+--- ITE
+red i(c(0)) > 0 ? 1 : 0 .
+red b(c(0)) ? true : b(c(1)) .
+red r(c(0)) <= 1/3 ? r(c(0)) + 1/2 : r(c(0)) .
+red smtCheck(true ? r(c(0)) === 1/2 : b(c(0))) .

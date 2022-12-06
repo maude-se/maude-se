@@ -41,7 +41,7 @@ build_deps() {
   progress "Prepare SMT solvers"
   build_z3
   build_yices2
-  # build_cvc4
+  build_cvc4
   # TODO: Change this to cvc5
 
   # build dependencies for flowstar
@@ -62,6 +62,7 @@ patch_maude() {
   patch "$maude_src_dir/src/Makefile.am" < "$patch_src_dir/makefile-am.patch"
   patch "$maude_src_dir/src/Main/Makefile.am" < "$patch_src_dir/main-makefile-am.patch"
   patch "$maude_src_dir/src/Mixfix/yices2_Bindings.hh" < "$patch_src_dir/mixfix-yices2-bindings-hh.patch"
+  patch "$maude_src_dir/src/Mixfix/cvc4_Bindings.hh" < "$patch_src_dir/mixfix-cvc4-bindings-hh.patch"
   patch "$maude_src_dir/src/Mixfix/Makefile.am" < "$patch_src_dir/mixfix-makefile-am.patch"
   patch "$maude_src_dir/src/Mixfix/symbolType.hh" < "$patch_src_dir/mixfix-symbol-type-hh.patch"
   patch "$maude_src_dir/src/Mixfix/specialSymbolTypes.cc" < "$patch_src_dir/mixfix-special-symbol-types-cc.patch"
@@ -76,12 +77,7 @@ run_test() {
 
   cp $top_dir/src/smt-check.maude $maude_bin_dir
 
-  $maude_bin_dir/maude \
-    < $test_dir/1.maude -no-banner -no-advise \
-    > 1.out 2>&1
-
-  diff $top_dir/src/tests/1.expected 1.out > 1.result
-  print_test_result 1.result
+  cd $test_dir && make && make clean
 }
 
 print_test_result(){
@@ -214,15 +210,14 @@ build_maude_yices2() {
 
 # build maude with cvc4
 build_maude_cvc4() {
-    #build_z3
-    if [ "$1" == "mac" ]; then
-      mac_build_maude --with-yices2=no --with-cvc4=yes
-    else
-      build_maude --with-yices2=no --with-cvc4=yes
-    fi
+  if [ $OS_NAME == "Darwin" ]; then
+	  echo "Mac detected"
+	  mac_build_maude --with-yices2=no --with-cvc4=yes
+  else
+	  echo "Linux detected"
+	  build_maude --with-yices2=no --with-cvc4=yes
+  fi
 }
-
-
 
 
 build_z3() {
@@ -283,14 +278,17 @@ build_cvc4() {
   mkdir -p "$build_dir"
   mkdir -p "$third_party"
   (	progress "Downloading CVC4"
-    git clone https://github.com/CVC4/CVC4 "$third_party/cvc4"
+    git clone https://github.com/CVC4/CVC4-archived.git "$third_party/cvc4"
     
     cd "$third_party/cvc4"
+    git checkout f8d6bd369a662620c6295a6098dbf8eced37cc6b
+
+    ./autogen.sh
     ./contrib/get-antlr-3.4
-    ./configure.sh production --prefix="$build_dir" --static --no-static-binary \
-    --gmp-dir="$lib_dir"/libgmp.a
+    ./configure production --prefix="$build_dir" --enable-static --disable-shared \
+    LIBS="$lib_dir"/libgmp.a
     
-    cd "./build"
+    cd "./builds"
 
     make -s -j4
     make check
@@ -507,11 +505,11 @@ prepare_maude() {
 
 build_command="$1" ; shift
 case "$build_command" in
-    test)         run_test    "$@" ;;
-    patch)        patch_maude     "$@" ;;
-    prep-extra)		extract_all_dep		              "$@" ;;
-    prep-git)		  prep_git		                    "$@" ;;
-    build-cudd)		build_cudd		                  "$@" ;;
+    test)               run_test                  "$@" ;;
+    patch)              patch_maude               "$@" ;;
+    prep-extra)		    extract_all_dep		      "$@" ;;
+    prep-git)		    prep_git		          "$@" ;;
+    build-cudd)		    build_cudd		          "$@" ;;
     build-libsigsegv)   build_libsigsegv          "$@" ;;
     build-libncurses)   build_libncurses          "$@" ;;
     build-tecla)        build_tecla               "$@" ;;
@@ -521,7 +519,7 @@ case "$build_command" in
     build-dreal3)       build_dreal3              "$@" ;;
     build-z3)           build_z3                  "$@" ;;
     build-yices2)       build_yices2              "$@" ;;
-    build-cvc4)		      build_cvc4		            "$@" ;;
+    build-cvc4)		    build_cvc4		          "$@" ;;
     clean)              build_clean               "$@" ;;
     deps)               build_deps                "$@" ;;
     maude)              build_maude               "$@" ;;
@@ -529,7 +527,7 @@ case "$build_command" in
     mac-maude)          mac_build_maude           "$@" ;;
     maude-ode)          build_maude_ode           "$@" ;;
     maude-ode-z3)       build_maude_ode_z3        "$@" ;;
-    maude-ode-flowstar) build_maude_ode_flowstar "$@" ;;
+    maude-ode-flowstar) build_maude_ode_flowstar  "$@" ;;
     maude-z3)           build_maude_z3            "$@" ;;
     maude-z3-debug)     build_maude_z3_debug      "$@" ;;
     maude-yices2)       build_maude_yices2        "$@" ;;

@@ -380,7 +380,7 @@ expr SmtManager::variableGenerator(DagNode *dag, ExprType exprType) {
     return newVariable;
 }
 
-DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extensionSymbol,
+DagNode* SmtManager::Term2Dag(expr e, ExtensionSymbol* extensionSymbol,
                               ReverseSmtManagerVariableMap* rsv){
     if(rsv != nullptr){
         ReverseSmtManagerVariableMap::const_iterator it = rsv->find(e);
@@ -442,7 +442,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
             arg[0] = q_var;
 
             if (prev == nullptr){
-                arg[1] = Term2Dag(e.body(), exprType, extensionSymbol, rsv);
+                arg[1] = Term2Dag(e.body(), extensionSymbol, rsv);
                 prev = symbol->makeDagNode(arg);
             } else {
                 arg[1] = prev;
@@ -502,7 +502,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
             arg[0] = q_var;
 
             if (prev == nullptr){
-                arg[1] = Term2Dag(e.body(), exprType, extensionSymbol, rsv);
+                arg[1] = Term2Dag(e.body(), extensionSymbol, rsv);
                 prev = symbol->makeDagNode(arg);
             } else {
                 arg[1] = prev;
@@ -519,7 +519,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
 
     if (e.is_not()) {
         Vector < DagNode * > arg(1);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
         return extensionSymbol->notBoolSymbol->makeDagNode(arg);
     }
 
@@ -527,7 +527,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++){
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::AND, extensionSymbol);
     }
@@ -536,22 +536,22 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++){
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::OR, extensionSymbol);
     }
 
     if (e.is_xor()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         return extensionSymbol->xorBoolSymbol->makeDagNode(arg);
     }
 
     if (e.is_implies()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         return extensionSymbol->impliesBoolSymbol->makeDagNode(arg);
     }
 
@@ -566,8 +566,8 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         Assert(check_bool_eq && check_int_eq && check_real_eq, "lhs and rhs should have the same type");
 
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e1, exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e2, exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e1, extensionSymbol, rsv);
+        arg[1] = Term2Dag(e2, extensionSymbol, rsv);
         if (e1.is_bool()){
             return extensionSymbol->eqBoolSymbol->makeDagNode(arg);
         } else if (e1.is_int()){
@@ -580,9 +580,9 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
     // boolean
     if (e.is_ite()) {
         Vector < DagNode * > arg(3);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
-        arg[2] = Term2Dag(e.arg(2), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
+        arg[2] = Term2Dag(e.arg(2), extensionSymbol, rsv);
         if (e.arg(1).is_int())
             return extensionSymbol->iteIntSymbol->makeDagNode(arg);
         else if (e.arg(1).is_real())
@@ -593,8 +593,8 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
     // boolean type
     if (e.is_app() && Z3_OP_LT == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         if (e.arg(0).is_int()) {
             return extensionSymbol->ltIntSymbol->makeDagNode(arg);
         } else {
@@ -604,8 +604,8 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
 
     if (e.is_app() && Z3_OP_LE == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         if (e.arg(0).is_int()) {
             return extensionSymbol->leqIntSymbol->makeDagNode(arg);
         } else {
@@ -615,8 +615,8 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
 
     if (e.is_app() && Z3_OP_GT == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         if (e.arg(0).is_int()) {
             return extensionSymbol->gtIntSymbol->makeDagNode(arg);
         } else {
@@ -626,8 +626,8 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
 
     if (e.is_app() && Z3_OP_GE == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         if (e.arg(0).is_int()) {
             return extensionSymbol->geqIntSymbol->makeDagNode(arg);
         } else {
@@ -637,8 +637,8 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
 
     if (e.is_app() && Z3_OP_EQ == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         if (e.arg(0).is_int()) {
             return extensionSymbol->eqIntSymbol->makeDagNode(arg);
         } else {
@@ -648,7 +648,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
 
     if (e.is_app() && Z3_OP_IS_INT == e.decl().decl_kind()) {
         Vector < DagNode * > arg(1);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
         return extensionSymbol->isIntegerSymbol->makeDagNode(arg);
     }
 
@@ -657,12 +657,12 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
      */
     if (e.is_app() && Z3_OP_TO_INT == e.decl().decl_kind()) {
         Vector < DagNode * > arg(1);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
         return extensionSymbol->toIntegerSymbol->makeDagNode(arg);
     }
     if (e.is_int() && e.is_app() && Z3_OP_UMINUS == e.decl().decl_kind()) {
         Vector < DagNode * > arg(1);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
         return extensionSymbol->unaryMinusIntSymbol->makeDagNode(arg);
     }
 
@@ -670,7 +670,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++) {
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::INT_ADD, extensionSymbol);
     }
@@ -679,7 +679,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++){
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::INT_SUB, extensionSymbol);
     }
@@ -688,23 +688,23 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++) {
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::INT_MUL, extensionSymbol);
     }
 
     if (e.is_int() && e.is_app() && Z3_OP_DIV == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         return extensionSymbol->divIntSymbol->makeDagNode(arg);
     }
 
 
     if (e.is_int() && e.is_app() && Z3_OP_MOD == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         return extensionSymbol->modIntSymbol->makeDagNode(arg);
     }
 
@@ -727,13 +727,13 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
      */
     if (e.is_app() && Z3_OP_TO_REAL == e.decl().decl_kind()) {
         Vector < DagNode * > arg(1);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
         return extensionSymbol->toRealSymbol->makeDagNode(arg);
     }
 
     if (e.is_real() && e.is_app() && Z3_OP_UMINUS == e.decl().decl_kind()) {
         Vector < DagNode * > arg(1);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
         return extensionSymbol->unaryMinusRealSymbol->makeDagNode(arg);
     }
 
@@ -741,7 +741,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++){
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::REAL_ADD, extensionSymbol);
     }
@@ -750,7 +750,7 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++){
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::REAL_SUB, extensionSymbol);
     }
@@ -759,15 +759,15 @@ DagNode* SmtManager::Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extens
         unsigned child_num = e.num_args();
         Vector < DagNode* > arg(child_num);
         for (unsigned i = 0; i < child_num; i++){
-            arg[i] = Term2Dag(e.arg(i), exprType, extensionSymbol, rsv);
+            arg[i] = Term2Dag(e.arg(i), extensionSymbol, rsv);
         }
         return multipleGen(&arg, 0, MulType::REAL_MUL, extensionSymbol);
     }
 
     if (e.is_real() && e.is_app() && Z3_OP_DIV == e.decl().decl_kind()) {
         Vector < DagNode * > arg(2);
-        arg[0] = Term2Dag(e.arg(0), exprType, extensionSymbol, rsv);
-        arg[1] = Term2Dag(e.arg(1), exprType, extensionSymbol, rsv);
+        arg[0] = Term2Dag(e.arg(0), extensionSymbol, rsv);
+        arg[1] = Term2Dag(e.arg(1), extensionSymbol, rsv);
         return extensionSymbol->divRealSymbol->makeDagNode(arg);
     }
 
@@ -940,7 +940,7 @@ DagNode* SmtManager::simplifyDag(DagNode *dagNode, ExtensionSymbol* extensionSym
         if (hasVariable){
             rsv = generateReverseVariableMap();
         }
-        DagNode* dn = Term2Dag(e, ExprType::INT, extensionSymbol, rsv);
+        DagNode* dn = Term2Dag(e, extensionSymbol, rsv);
         if (hasVariable)
             delete rsv;
         return dn;
@@ -967,7 +967,7 @@ DagNode* SmtManager::applyTactic(DagNode* dagNode, DagNode* tacticTypeDagNode, E
 
         Vector < DagNode * > arg(r_size);
         for (int i = 0; i < r_size; i++) {
-            arg[i] = Term2Dag(r[i].as_expr(), ExprType::INT, extensionSymbol, rsv);
+            arg[i] = Term2Dag(r[i].as_expr(), extensionSymbol, rsv);
         }
 
         if (r_size == 1) {
@@ -1018,53 +1018,4 @@ tactic SmtManager::Dag2Tactic(TacticApplySymbol* tacticApplySymbol, DagNode* tac
 
     IssueWarning("cannot find right tactic");
     throw ExtensionException("fail to find proper tactic");
-}
-
-DagNode* SmtManager::InferTerm2Dag(expr e, DagNode* dagNode, ExtensionSymbol* extensionSymbol){
-    ReverseSmtManagerVariableMap* rsv = nullptr;
-    if (hasVariable){
-        rsv = generateReverseVariableMap();
-    }
-
-    Symbol* symbol = dagNode->symbol();
-    DagNode* dn;
-    if(symbol == extensionSymbol->toIntegerSymbol)
-        dn = Term2Dag(e, ExprType::INT, extensionSymbol, rsv);
-    else if (symbol == extensionSymbol->toRealSymbol)
-        dn = Term2Dag(e, ExprType::REAL, extensionSymbol, rsv);
-    else if(symbol == extensionSymbol->intVarSymbol)
-        dn = Term2Dag(e, ExprType::INT, extensionSymbol, rsv);
-    else if(symbol == extensionSymbol->realVarSymbol)
-        dn = Term2Dag(e, ExprType::REAL, extensionSymbol, rsv);
-    else if(symbol == extensionSymbol->boolVarSymbol)
-        dn = Term2Dag(e, ExprType::BOOL, extensionSymbol, rsv);
-    else if (e.is_true())
-        return extensionSymbol->trueTerm.getDag();
-    else if (e.is_false())
-        return extensionSymbol->falseTerm.getDag();
-    else {
-        Sort *sort = dagNode->symbol()->getRangeSort();
-
-        switch (smtInfo.getType(sort)) {
-            case SMT_Info::NOT_SMT: {
-                IssueWarning(QUOTE(dagNode) << " is not a valid term.");
-                throw ExtensionException("not a valid term.");
-            }
-            case SMT_Info::BOOLEAN: {
-                dn = Term2Dag(e, ExprType::BOOL, extensionSymbol, rsv);
-                break;
-            }
-            case SMT_Info::INTEGER: {
-                dn = Term2Dag(e, ExprType::INT, extensionSymbol, rsv);
-                break;
-            }
-            case SMT_Info::REAL: {
-                dn = Term2Dag(e, ExprType::REAL, extensionSymbol, rsv);
-                break;
-            }
-        }
-    }
-    if (hasVariable)
-        delete rsv;
-    return dn;
 }

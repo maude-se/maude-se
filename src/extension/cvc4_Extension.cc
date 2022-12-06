@@ -33,6 +33,18 @@ SmtManager::SmtManager(const SMT_Info &smtInfo)
     hasVariable = false;
 }
 
+void SmtManager::setSolverTo(bool isLinear) {
+    smtEngine->reset();
+    smtEngine->setOption("produce-models", new SExpr(true));
+    if (isLinear){
+        smtEngine->setLogic("QF_LIRA");
+        isSolverLinear = true;
+    } else {
+        smtEngine->setLogic("QF_NIRA");
+        isSolverLinear = false;
+    }
+}
+
 void SmtManager::prefixGetValue(SmtEngine &smt, Expr e, Assignment *assn, int level) {
 
     // Checks if this is correct or not.
@@ -59,26 +71,35 @@ void SmtManager::prefixGetValue(SmtEngine &smt, Expr e, Assignment *assn, int le
 
 SmtManager::SmtResult SmtManager::checkDagContextFree(DagNode *dag,
                                                       ExtensionSymbol* extensionSymbol){
+    setSolverTo(true);
     resetFormulaSize();
     checkDagResultExp = makeExpr(dag, extensionSymbol, true);
     Verbose("SmtCheckSymbol : Formula size " << formulaSize);
     resetFormulaSize();
-    if (checkDagResultExp.isNull())
+    if (checkDagResultExp.term.isNull())
         return SMT_BAD_DAG;
 
+    bool logicError = false;
     CVC4::Result result;
     try {
-        result = smtEngine->checkSat(checkDagResultExp);
-    } catch (const CVC4::LogicException&)
-    {
-        //	An expression is out-side of the supported logic - e.g. nonlinear.
-        IssueWarning("Caught CVC4::LogicException - giving up.");
-        return SMT_SAT_UNKNOWN;
+        result = smtEngine->checkSat(checkDagResultExp.term);
+    } catch (const CVC4::LogicException&) {
+        logicError = true;
+    }
+
+    if (logicError){
+        setSolverTo(false);
+        try {
+            result = smtEngine->checkSat(checkDagResultExp.term);
+        } catch (const CVC4::LogicException&) {
+            //	An expression is out-side of the supported logic - e.g. nonlinear.
+            IssueWarning("Caught CVC4::LogicException - giving up.");
+            return SMT_SAT_UNKNOWN;
+        }
     }
 
     CVC4::Result::Sat sat = result.isSat();
-    if (sat == CVC4::Result::SAT_UNKNOWN)
-    {
+    if (sat == CVC4::Result::SAT_UNKNOWN) {
         IssueWarning("CVC4 not able to determine satisfiability  - giving up.");
         return SMT_SAT_UNKNOWN;
     }
@@ -87,12 +108,12 @@ SmtManager::SmtResult SmtManager::checkDagContextFree(DagNode *dag,
 
 // Assumption: must be called after all satCheck is done.
 DagNode* SmtManager::generateAssignment(DagNode *dagNode,
-                                  SmtCheckerSymbol* smtCheckerSymbol) {
+                                        SmtCheckerSymbol* smtCheckerSymbol) {
     Vector < DagNode * > dv;
     Vector < DagNode * > finalResult;
 
     Assignment assignment;
-    prefixGetValue(*smtEngine, checkDagResultExp, &assignment);
+    prefixGetValue(*smtEngine, checkDagResultExp.term, &assignment);
 
     int num = assignment.size();
 
@@ -128,13 +149,19 @@ DagNode* SmtManager::generateAssignment(DagNode *dagNode,
     return smtCheckerSymbol->smtAssignmentResultSymbol->makeDagNode(finalResult);
 }
 
+void SmtManager::clearAssertions() {
+    // overriding variable generator's clear assertions
+    pushCount = 0;
+    smtEngine->reset();
+}
+
 DagNode* SmtManager::GenerateDag(Expr lhs, Expr rhs, SmtCheckerSymbol* smtCheckerSymbol,
                                  ReverseSmtManagerVariableMap* rsv) {
 
     Vector < DagNode * > args(2);
     bool isNone = true;
     for(auto it = rsv->begin(); it != rsv->end(); it++){
-        if (it->first.getId() == lhs.getId()){
+        if (it->first.term.getId() == lhs.getId()){
             args[0] = it->second;
             isNone = false;
             break;
@@ -170,8 +197,17 @@ DagNode* SmtManager::GenerateDag(Expr lhs, Expr rhs, SmtCheckerSymbol* smtChecke
 
 }
 
-DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extensionSymbol,
+DagNode *SmtManager::Term2Dag(cvc4_term expr, ExtensionSymbol* extensionSymbol,
                               ReverseSmtManagerVariableMap* rsv){
+    if(rsv != nullptr){
+        ReverseSmtManagerVariableMap::const_iterator it = rsv->find(expr);
+        if (it != rsv->end()) {
+            return it->second;
+        }
+    }
+
+    Expr e = expr.term;
+
     switch (e.getKind()) {
         case kind::UNDEFINED_KIND:
             throw ExtensionException("undefined kind error");
@@ -188,21 +224,40 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
         }
         case kind::NOT: {
             Vector < DagNode * > arg(1);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
+
+            cvc4_term child{};
+            child.term = e[0];
+            child.type = exprManager->booleanType();
+
+            arg[0] = Term2Dag(child, extensionSymbol, rsv);
             return extensionSymbol->notBoolSymbol->makeDagNode(arg);
         }
         case kind::AND: {
             size_t child_num = e.getNumChildren();
             Vector < DagNode* > arg(child_num);
             for(size_t i = 0; i < child_num; i++){
-                arg[i] = Term2Dag(e[i], exprType, extensionSymbol, rsv);
+                cvc4_term child{};
+                child.term = e[i];
+                child.type = exprManager->booleanType();
+
+                arg[i] = Term2Dag(child, extensionSymbol, rsv);
             }
             return multipleGen(&arg, 0, MulType::AND, extensionSymbol);
         }
         case kind::IMPLIES: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            child1.type = exprManager->booleanType();
+            child2.type = exprManager->booleanType();
+
+            arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+            arg[1] = Term2Dag(child2, extensionSymbol, rsv);
             return extensionSymbol->impliesBoolSymbol->makeDagNode(arg);
 
         }
@@ -210,35 +265,102 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
             size_t child_num = e.getNumChildren();
             Vector < DagNode* > arg(child_num);
             for(size_t i = 0; i < child_num; i++){
-                arg[i] = Term2Dag(e[i], exprType, extensionSymbol, rsv);
+                cvc4_term child{};
+                child.term = e[i];
+                child.type = exprManager->booleanType();
+
+                arg[i] = Term2Dag(child, extensionSymbol, rsv);
             }
             return multipleGen(&arg, 0, MulType::OR, extensionSymbol);
         }
         case kind::XOR: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            child1.type = exprManager->booleanType();
+            child2.type = exprManager->booleanType();
+
+            arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+            arg[1] = Term2Dag(child2, extensionSymbol, rsv);
             return extensionSymbol->xorBoolSymbol->makeDagNode(arg);
         }
         case kind::EQUAL: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
-            return extensionSymbol->eqBoolSymbol->makeDagNode(arg);
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            if (e[0].getType().isInteger()) {
+                child1.type = exprManager->integerType();
+                child2.type = exprManager->integerType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+                return extensionSymbol->eqIntSymbol->makeDagNode(arg);
+            } else if (e[0].getType().isReal()) {
+                child1.type = exprManager->realType();
+                child2.type = exprManager->realType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+                return extensionSymbol->eqRealSymbol->makeDagNode(arg);
+            } else if (e[0].getType().isBoolean()){
+                child1.type = exprManager->booleanType();
+                child2.type = exprManager->booleanType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+                return extensionSymbol->eqBoolSymbol->makeDagNode(arg);
+            } else {
+                // raise error
+            }
         }
         case kind::ITE: {
             Vector < DagNode * > arg(3);
-            Expr child1 = e[1];
-            Expr child2 = e[2];
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(child1, exprType, extensionSymbol, rsv);
-            arg[2] = Term2Dag(child2, exprType, extensionSymbol, rsv);
 
-            if (exprType == ExprType::INT)
+            cvc4_term child1{};
+            cvc4_term child2{};
+            cvc4_term child3{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+            child3.term = e[2];
+
+            child1.type = exprManager->booleanType();
+            arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+
+            if (e[1].getType().isInteger()) {
+                child2.type = exprManager->integerType();
+                child3.type = exprManager->integerType();
+
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+                arg[2] = Term2Dag(child3, extensionSymbol, rsv);
                 return extensionSymbol->iteIntSymbol->makeDagNode(arg);
-            else if (exprType == ExprType::REAL)
+            } else if (e[1].getType().isReal()) {
+                child2.type = exprManager->realType();
+                child3.type = exprManager->realType();
+
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+                arg[2] = Term2Dag(child3, extensionSymbol, rsv);
                 return extensionSymbol->iteRealSymbol->makeDagNode(arg);
-            return extensionSymbol->iteBoolSymbol->makeDagNode(arg);
+            } else if (e[1].getType().isBoolean()) {
+                child2.type = exprManager->booleanType();
+                child3.type = exprManager->booleanType();
+
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+                arg[2] = Term2Dag(child3, extensionSymbol, rsv);
+                return extensionSymbol->iteBoolSymbol->makeDagNode(arg);
+            } else {
+                // raise error
+            }
         }
 
         /**
@@ -248,9 +370,19 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
             size_t child_num = e.getNumChildren();
             Vector < DagNode* > arg(child_num);
             for(size_t i = 0; i < child_num; i++){
-                arg[i] = Term2Dag(e[i], exprType, extensionSymbol, rsv);
+                cvc4_term child{};
+                child.term = e[i];
+
+                if (e[i].getType().isInteger()){
+                    child.type = exprManager->integerType();
+                } else {
+                    child.type = exprManager->realType();
+                }
+
+                arg[i] = Term2Dag(child, extensionSymbol, rsv);
             }
-            if (exprType == ExprType::INT){
+
+            if (expr.type.isInteger()){
                 return multipleGen(&arg, 0, MulType::INT_ADD, extensionSymbol);
             } else {
                 return multipleGen(&arg, 0, MulType::REAL_ADD, extensionSymbol);
@@ -260,9 +392,18 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
             size_t child_num = e.getNumChildren();
             Vector < DagNode* > arg(child_num);
             for(size_t i = 0; i < child_num; i++){
-                arg[i] = Term2Dag(e[i], exprType, extensionSymbol, rsv);
+                cvc4_term child{};
+                child.term = e[i];
+
+                if (e[i].getType().isInteger()){
+                    child.type = exprManager->integerType();
+                } else {
+                    child.type = exprManager->realType();
+                }
+
+                arg[i] = Term2Dag(child, extensionSymbol, rsv);
             }
-            if (exprType == ExprType::INT){
+            if (expr.type.isInteger()){
                 return multipleGen(&arg, 0, MulType::INT_MUL, extensionSymbol);
             } else {
                 return multipleGen(&arg, 0, MulType::REAL_MUL, extensionSymbol);
@@ -273,9 +414,17 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
             size_t child_num = e.getNumChildren();
             Vector < DagNode* > arg(child_num);
             for(size_t i = 0; i < child_num; i++){
-                arg[i] = Term2Dag(e[i], exprType, extensionSymbol, rsv);
+                cvc4_term child{};
+                child.term = e[i];
+
+                if (e[i].getType().isInteger()){
+                    child.type = exprManager->integerType();
+                } else {
+                    child.type = exprManager->realType();
+                }
+                arg[i] = Term2Dag(child, extensionSymbol, rsv);
             }
-            if (exprType == ExprType::INT){
+            if (expr.type.isInteger()){
                 return multipleGen(&arg, 0, MulType::INT_MUL, extensionSymbol);
             } else {
                 return multipleGen(&arg, 0, MulType::REAL_MUL, extensionSymbol);
@@ -283,101 +432,233 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
         }
         case kind::MINUS: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
-            if (exprType == ExprType::INT) {
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            if (expr.type.isInteger()) {
+                child1.type = exprManager->integerType();
+                child2.type = exprManager->integerType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->mulIntSymbol->makeDagNode(arg);
             } else {
+                child1.type = exprManager->realType();
+                child2.type = exprManager->realType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->minusRealSymbol->makeDagNode(arg);
             }
         }
         case kind::UMINUS: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
-            if (exprType == ExprType::INT) {
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            if (expr.type.isInteger()) {
+                child1.type = exprManager->integerType();
+                child2.type = exprManager->integerType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->unaryMinusIntSymbol->makeDagNode(arg);
             } else {
+                child1.type = exprManager->realType();
+                child2.type = exprManager->realType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->unaryMinusRealSymbol->makeDagNode(arg);
             }
         }
         case kind::DIVISION: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child1.type = exprManager->realType();
+
+            child2.term = e[1];
+            child2.type = exprManager->realType();
+
+            arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+            arg[1] = Term2Dag(child2, extensionSymbol, rsv);
             return extensionSymbol->divRealSymbol->makeDagNode(arg);
         }
         case kind::INTS_DIVISION: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child1.type = exprManager->integerType();
+
+            child2.term = e[1];
+            child2.type = exprManager->integerType();
+
+            arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+            arg[1] = Term2Dag(child2, extensionSymbol, rsv);
             return extensionSymbol->divIntSymbol->makeDagNode(arg);
         }
         case kind::INTS_MODULUS: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child1.type = exprManager->integerType();
+
+            child2.term = e[1];
+            child2.type = exprManager->integerType();
+
+            arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+            arg[1] = Term2Dag(child2, extensionSymbol, rsv);
             return extensionSymbol->modIntSymbol->makeDagNode(arg);
         }
         case kind::LT: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
-            if (exprType == ExprType::INT) {
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            if (expr.type.isInteger()) {
+                child1.type = exprManager->integerType();
+                child2.type = exprManager->integerType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->ltIntSymbol->makeDagNode(arg);
             } else {
+                child1.type = exprManager->realType();
+                child2.type = exprManager->realType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->ltRealSymbol->makeDagNode(arg);
             }
         }
         case kind::GT: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
-            if (exprType == ExprType::INT) {
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            if (expr.type.isInteger()) {
+                child1.type = exprManager->integerType();
+                child2.type = exprManager->integerType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->gtIntSymbol->makeDagNode(arg);
             } else {
+                child1.type = exprManager->realType();
+                child2.type = exprManager->realType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->gtRealSymbol->makeDagNode(arg);
             }
         }
         case kind::LEQ: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
-            if (exprType == ExprType::INT) {
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            if (expr.type.isInteger()) {
+                child1.type = exprManager->integerType();
+                child2.type = exprManager->integerType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->leqIntSymbol->makeDagNode(arg);
             } else {
+                child1.type = exprManager->realType();
+                child2.type = exprManager->realType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->leqRealSymbol->makeDagNode(arg);
             }
         }
         case kind::GEQ: {
             Vector < DagNode * > arg(2);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
-            arg[1] = Term2Dag(e[1], exprType, extensionSymbol, rsv);
-            if (exprType == ExprType::INT) {
+
+            cvc4_term child1{};
+            cvc4_term child2{};
+
+            child1.term = e[0];
+            child2.term = e[1];
+
+            if (expr.type.isInteger()) {
+                child1.type = exprManager->integerType();
+                child2.type = exprManager->integerType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->geqIntSymbol->makeDagNode(arg);
             } else {
+                child1.type = exprManager->realType();
+                child2.type = exprManager->realType();
+
+                arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+                arg[1] = Term2Dag(child2, extensionSymbol, rsv);
                 return extensionSymbol->geqRealSymbol->makeDagNode(arg);
             }
         }
 
         case kind::IS_INTEGER: {
             Vector < DagNode * > arg(1);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
+            cvc4_term child{};
+            child.term = e[0];
+            child.type = exprManager->booleanType();
+
+            arg[0] = Term2Dag(child, extensionSymbol, rsv);
             return extensionSymbol->isIntegerSymbol->makeDagNode(arg);
         }
         case kind::TO_REAL: {
             // not a valid matching case, since integer is subtype of rational in cvc4.
             Vector < DagNode * > arg(1);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
+            cvc4_term child{};
+            child.term = e[0];
+            child.type = exprManager->realType();
+
+            arg[0] = Term2Dag(child, extensionSymbol, rsv);
             return extensionSymbol->toRealSymbol->makeDagNode(arg);
         }
         case kind::TO_INTEGER: {
             Vector < DagNode * > arg(1);
-            arg[0] = Term2Dag(e[0], exprType, extensionSymbol, rsv);
+
+            cvc4_term child{};
+            child.term = e[0];
+            child.type = exprManager->integerType();
+
+            arg[0] = Term2Dag(child, extensionSymbol, rsv);
             return extensionSymbol->toIntegerSymbol->makeDagNode(arg);
         }
         case kind::CONST_RATIONAL: {
-            if (exprType == ExprType::INT) {
+            if (expr.type.isInteger()) {
                 return new SMT_NumberDagNode(extensionSymbol->integerSymbol, e.getConst<Rational>().getValue());
             } else {
                 return new SMT_NumberDagNode(extensionSymbol->realSymbol, e.getConst<Rational>().getValue());
@@ -385,15 +666,9 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
         }
         case kind::VARIABLE: {
             if (rsv != nullptr) {
-                ReverseSmtManagerVariableMap::const_iterator it = rsv->find(e);
+                ReverseSmtManagerVariableMap::const_iterator it = rsv->find(expr);
                 if (it != rsv->end()) {
-                    if (e.getType().isInteger() && exprType == ExprType::REAL) {
-                        Vector < DagNode * > arg(1);
-                        arg[0] = it->second;
-                        return extensionSymbol->toRealSymbol->makeDagNode(arg);
-                    } else {
-                        return it->second;
-                    }
+                    return it->second;
                 }
             }
         }
@@ -403,12 +678,22 @@ DagNode *SmtManager::Term2Dag(Expr e, ExprType exprType, ExtensionSymbol* extens
     }
 }
 
-Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
+cvc4_term SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
     //	Deal with number constants (Integer or Real - CVC4 doesn't make much distinction).
     if (SMT_NumberDagNode* n = dynamic_cast<SMT_NumberDagNode*>(dag)){
-        string ratStr = n->getValue().get_str();
         incrFormulaSize();
-        return exprManager->mkConst(Rational(ratStr.c_str()));
+        Sort *sort = n->symbol()->getRangeSort();
+        if(AbstractSmtManager::smtInfo.getType(sort) == SMT_Info::INTEGER) {
+            cvc4_term term{};
+            term.term = exprManager->mkConst(Rational(n->getValue().get_str()));
+            term.type = exprManager->integerType();
+            return term;
+        } else if (AbstractSmtManager::smtInfo.getType(sort) == SMT_Info::REAL) {
+            cvc4_term term{};
+            term.term = exprManager->mkConst(Rational(n->getValue().get_str()));
+            term.type = exprManager->realType();
+            return term;
+        }
     }
 
     try {
@@ -419,12 +704,12 @@ Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
                 int nrArgs = s->arity();
 
                 // need to be initialized with original ctx.
-                std::vector <Expr> exprs;
+                std::vector <cvc4_term> exprs;
 
                 FreeDagNode *f = safeCast(FreeDagNode * , dag);
                 for (int i = 0; i < nrArgs; ++i) {
 
-                    Expr e = Dag2Term(f->getArgument(i), extensionSymbol);
+                    cvc4_term e = Dag2Term(f->getArgument(i), extensionSymbol);
                     //if (expr.isNull())
                     //    return expr;
                     exprs.push_back(e);
@@ -437,33 +722,53 @@ Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
                     //
                     case SMT_Symbol::CONST_TRUE: {
                         incrFormulaSize();
-                        return exprManager->mkConst(true);
+                        cvc4_term term{};
+                        term.term = exprManager->mkConst(true);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::CONST_FALSE: {
                         incrFormulaSize();
-                        return exprManager->mkConst(false);
+                        cvc4_term term{};
+                        term.term = exprManager->mkConst(false);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::NOT: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::NOT, exprs[0]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::NOT, exprs[0].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
 
                     case SMT_Symbol::AND: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::AND, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::AND, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::OR: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::OR, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::OR, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::XOR: {
                         incrFormulaSize();
-                        // there is no xor operation for c++ api
-                        return exprManager->mkExpr(kind::XOR, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::XOR, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::IMPLIES: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::IMPLIES, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::IMPLIES, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                         //
                         //	Polymorphic Boolean stuff.
@@ -481,43 +786,69 @@ Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
                             goto fail;
                         }
                         incrFormulaSize();
-                        //return exprManager->mkExpr(((smtType == SMT_Info::BOOLEAN) ? kind::IFF : kind::EQUAL), exprs[0], exprs[1]);
-                        return exprManager->mkExpr(kind::EQUAL, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::EQUAL, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::NOT_EQUALS: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::DISTINCT, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::DISTINCT, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::ITE: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::ITE, exprs[0], exprs[1], exprs[2]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::ITE, exprs[0].term, exprs[1].term, exprs[2].term);
+                        term.type = exprs[1].type;
+                        return term;
                     }
                         //
                         //	Integer stuff.
                         //
                     case SMT_Symbol::UNARY_MINUS: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::UMINUS, exprs[0]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::UMINUS, exprs[0].term);
+                        term.type = exprs[0].type;
+                        return term;
                     }
                     case SMT_Symbol::MINUS: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::MINUS, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::MINUS, exprs[0].term, exprs[1].term);
+                        term.type = exprs[0].type;
+                        return term;
                     }
                     case SMT_Symbol::PLUS: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::PLUS, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::PLUS, exprs[0].term, exprs[1].term);
+                        term.type = exprs[0].type;
+                        return term;
                     }
                     case SMT_Symbol::MULT: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::MULT, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::MULT, exprs[0].term, exprs[1].term);
+                        term.type = exprs[0].type;
+                        return term;
                     }
                     case SMT_Symbol::DIV: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::INTS_DIVISION, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::INTS_DIVISION, exprs[0].term, exprs[1].term);
+                        term.type = exprs[0].type;
+                        return term;
                     }
                     case SMT_Symbol::MOD: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::INTS_MODULUS, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::INTS_MODULUS, exprs[0].term, exprs[1].term);
+                        term.type = exprs[0].type;
+                        return term;
                     }
                         //
                         //	Integer tests.
@@ -525,19 +856,31 @@ Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
 
                     case SMT_Symbol::LT: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::LT, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::LT, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::LEQ: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::LEQ, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::LEQ, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::GT: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::GT, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::GT, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                     case SMT_Symbol::GEQ: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::GEQ, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::GEQ, exprs[0].term, exprs[1].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
 
                     case SMT_Symbol::DIVISIBLE: {
@@ -556,7 +899,10 @@ Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
                                 Divisible div(k);
                                 Expr divOp = exprManager->mkConst(div);
                                 incrFormulaSize();
-                                return exprManager->mkExpr(divOp, exprs[0]);
+                                cvc4_term term{};
+                                term.term = exprManager->mkExpr(divOp, exprs[0].term);
+                                term.type = exprManager->booleanType();
+                                return term;
                             }
                         }
                         IssueWarning("bad divisor in " << QUOTE(dag) << ".");
@@ -567,19 +913,31 @@ Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
                         //
                     case SMT_Symbol::REAL_DIVISION: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::DIVISION, exprs[0], exprs[1]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::DIVISION, exprs[0].term, exprs[1].term);
+                        term.type = exprs[0].type;
+                        return term;
                     }
                     case SMT_Symbol::TO_REAL: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::TO_REAL, exprs[0]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::TO_REAL, exprs[0].term);
+                        term.type = exprManager->realType();
+                        return term;
                     }
                     case SMT_Symbol::TO_INTEGER: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::TO_INTEGER, exprs[0]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::TO_INTEGER, exprs[0].term);
+                        term.type = exprManager->integerType();
+                        return term;
                     }
                     case SMT_Symbol::IS_INTEGER: {
                         incrFormulaSize();
-                        return exprManager->mkExpr(kind::IS_INTEGER, exprs[0]);
+                        cvc4_term term{};
+                        term.term = exprManager->mkExpr(kind::IS_INTEGER, exprs[0].term);
+                        term.type = exprManager->booleanType();
+                        return term;
                     }
                 }
             }
@@ -591,7 +949,7 @@ Expr SmtManager::Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol) {
     }
 }
 
-Expr SmtManager::variableGenerator(DagNode *dag, ExprType exprType) {
+cvc4_term SmtManager::variableGenerator(DagNode *dag, ExprType exprType) {
     hasVariable = true;
 
     // Find if there is already a dag node registered.
@@ -622,7 +980,7 @@ Expr SmtManager::variableGenerator(DagNode *dag, ExprType exprType) {
                 IssueWarning("Variable " << QUOTE(static_cast<DagNode *>(v)) << " does not belong to an SMT sort.");
                 SMT_NULL_TERM();
             }
-            case SMT_Info::BOOLEAN:
+            case SMT_Info::BOOLEAN: {
                 type = exprManager->booleanType();
                 name = name + "_" + string("Boolean");
                 break;
@@ -663,66 +1021,40 @@ Expr SmtManager::variableGenerator(DagNode *dag, ExprType exprType) {
     }
     incrFormulaSize();
 
-    Expr newVariable = exprManager->mkVar(name.c_str(), type);
-    smtManagerVariableMap.insert(SmtManagerVariableMap::value_type(dag, newVariable));
-    return newVariable;
+    cvc4_term newTerm{};
+    newTerm.term = exprManager->mkVar(name.c_str(), type);
+    newTerm.type = type;
+    smtManagerVariableMap.insert(SmtManagerVariableMap::value_type(dag, newTerm));
+    return newTerm;
 }
 
 DagNode *SmtManager::simplifyDag(DagNode *dagNode, ExtensionSymbol* extensionSymbol) {
     try {
         resetFormulaSize();
-        Expr expr = makeExpr(dagNode, extensionSymbol, false);
+        cvc4_term expr = makeExpr(dagNode, extensionSymbol, false);
         Verbose("SimplifyFormulaSymbol : Formula size " << formulaSize);
         resetFormulaSize();
 
-        Expr simplified_expr = smtEngine->simplify(expr);
-        DagNode *dn;
+        expr.term = smtEngine->simplify(expr.term);
 
         ReverseSmtManagerVariableMap* rsv = nullptr;
         if (hasVariable){
             rsv = generateReverseVariableMap();
         }
 
-        Symbol* symbol = dagNode->symbol();
-        if(symbol == extensionSymbol->toIntegerSymbol)
-            dn = Term2Dag(simplified_expr, ExprType::INT, extensionSymbol, rsv);
-        else if (symbol == extensionSymbol->toRealSymbol)
-            dn = Term2Dag(simplified_expr, ExprType::REAL, extensionSymbol, rsv);
-        else if(symbol == extensionSymbol->intVarSymbol)
-            dn = Term2Dag(simplified_expr, ExprType::INT, extensionSymbol, rsv);
-        else if(symbol == extensionSymbol->realVarSymbol)
-            dn = Term2Dag(simplified_expr, ExprType::REAL, extensionSymbol, rsv);
-        else if(symbol == extensionSymbol->boolVarSymbol)
-            dn = Term2Dag(simplified_expr, ExprType::BOOL, extensionSymbol, rsv);
-        else {
-            Sort *sort = dagNode->symbol()->getRangeSort();
+        DagNode* dn = Term2Dag(expr, extensionSymbol, rsv);
 
-            switch (AbstractSmtManager::smtInfo.getType(sort)) {
-                case SMT_Info::NOT_SMT: {
-                    IssueWarning("dag " << QUOTE(dagNode) << " is a not valid term.");
-                    throw ExtensionException("dag is not valid term.");
-                }
-                case SMT_Info::BOOLEAN: {
-                    dn = Term2Dag(simplified_expr, ExprType::BOOL, extensionSymbol, rsv);
-                    break;
-                }
-                case SMT_Info::INTEGER: {
-                    dn = Term2Dag(simplified_expr, ExprType::INT, extensionSymbol, rsv);
-                    break;
-                }
-                case SMT_Info::REAL: {
-                    dn = Term2Dag(simplified_expr, ExprType::REAL, extensionSymbol, rsv);
-                    break;
-                }
-            }
-        }
         if (hasVariable)
             delete rsv;
         return dn;
     } catch (ExtensionException &ex) {
         IssueWarning("error simplify dag with " << ex.c_str());
-        throw ExtensionException("Error while smt solving");
+        throw ExtensionException("error while smt solving");
     } catch(CVC4::IllegalArgumentException){
         throw ExtensionException("CVC4 return illegalArgument error");
     }
+}
+
+DagNode* SmtManager::applyTactic(DagNode* dagNode, DagNode* tacticTypeDagNode, ExtensionSymbol* extensionSymbol){
+    return dagNode;
 }

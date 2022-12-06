@@ -7,14 +7,60 @@ set show advisories off .
 fmod TEST is
    pr NAT .
    pr SMT-CHECK .
-   sorts S1 S2 S3 .
-   subsort RealExpr < S1 < S2 .
-   subsort RealExpr < S3 .
+   sorts BS1 BS2 BS3 .
+   subsort RealExpr < BS1 < BS2 .
+   subsort RealExpr < BS3 .
+
+   sorts IS1 IS2 IS3 .
+   subsort IntegerExpr < BS1 < BS2 .
+   subsort IntegerExpr < BS3 .
+
+   sorts RS1 RS2 RS3 .
+   subsort RealExpr < RS1 < RS2 .
+   subsort RealExpr < RS3 .
+
    op c : Nat -> SMTVarId .  
 endfm
 
 --- sort error test case
-red simplifyFormula(r(c(0)) === 0/1) .
+--- IntegerExpr
+red simplifyFormula(i(c(0)) === 0) .
 red simplifyFormula(i(c(0)) === toInteger(0/1)) .
 red simplifyFormula(toInteger(r(c(0)))) .
 red simplifyFormula(toInteger(0/1 + 1/1 + 2/1)) .
+red simplifyFormula(1 * 2 * 3) .
+red simplifyFormula(1 * toInteger(4/2) * 3) .
+red simplifyFormula(1 * 2 + 3) .
+red simplifyFormula(1 * toInteger(4/2) + 3) .
+red simplifyFormula(1 > 1) .
+red simplifyFormula(1 >= 1) .
+red simplifyFormula(3 div 1) .
+red simplifyFormula(3 div 2) .
+red simplifyFormula(3 div (1 + 2)) .
+red simplifyFormula(3 mod 1) .
+red simplifyFormula(3 mod 2) .
+red simplifyFormula(3 mod 3) .
+
+--- BooleanExpr
+red simplifyFormula(b(c(0)) === true) .
+red simplifyFormula(b(c(0)) === false) .
+red simplifyFormula(b(c(0)) =/== false) .
+red simplifyFormula(b(c(0)) =/== true) .
+red simplifyFormula(b(c(1))) .
+
+--- RealExpr
+--- red simplifyFormula(r(c(0)) =/== 1/1) .
+red simplifyFormula(r(c(0)) === 1/1) .
+red simplifyFormula(r(c(1)) === 1/1 + 1/1) .
+red simplifyFormula(r(c(1)) === 1/1 * 1/1 * 1/3) .
+red simplifyFormula(1/12 > 1/12) .
+red simplifyFormula(1/12 >= 1/12) .
+red simplifyFormula((1/1 - 1/1) / 2/1) .
+red simplifyFormula(2/1 / 3/1) .
+
+--- ITE
+--- red simplifyFormula(i(c(0)) > 0 ? 1 : 0) .
+--- red simplifyFormula(r(c(0)) > 1/2 ? 1 : 0) .
+red simplifyFormula(i(c(0)) === 0 ? 1 : 0) .
+red simplifyFormula(true ? 1 : 0) .
+red simplifyFormula(true ? 1/1 + 1/1 : 0/1) .

@@ -114,7 +114,7 @@ public:
      * variableGenerator should know its dag parameter type before calling.
      * checkDagExtension's result is different type compare to SMT_EngineWrapper result type.
      */
-    virtual DagNode* Term2Dag(T exp, ExprType exprType, ExtensionSymbol* extensionSymbol, ReverseSmtManagerVariableMap* rsv) noexcept(false) = 0;
+    virtual DagNode* Term2Dag(T exp, ExtensionSymbol* extensionSymbol, ReverseSmtManagerVariableMap* rsv) noexcept(false) = 0;
     virtual T Dag2Term(DagNode* dag, ExtensionSymbol* extensionSymbol) noexcept(false) = 0;
     virtual DagNode* generateAssignment(DagNode* dagNode, SmtCheckerSymbol* smtCheckerSymbol) = 0;
     virtual DagNode* simplifyDag(DagNode* dagNode, ExtensionSymbol* extensionSymbol)= 0;

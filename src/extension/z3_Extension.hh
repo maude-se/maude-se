@@ -76,8 +76,8 @@ protected:
      * SmtManager class interface implementation
      */
     expr Dag2Term(DagNode *dag, ExtensionSymbol* extensionSymbol);
-    DagNode *Term2Dag(expr e, ExprType exprType, ExtensionSymbol* extensionSymbol,
-            ReverseSmtManagerVariableMap* rsv = nullptr);
+    DagNode *Term2Dag(expr e, ExtensionSymbol* extensionSymbol,
+                      ReverseSmtManagerVariableMap* rsv = nullptr);
 
     expr variableGenerator(DagNode *dag, ExprType exprType);
     DagNode *GenerateDag(expr lhs, expr rhs, SmtCheckerSymbol* smtCheckerSymbol, ReverseSmtManagerVariableMap* rsv);
