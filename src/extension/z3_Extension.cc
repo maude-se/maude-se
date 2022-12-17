@@ -82,7 +82,7 @@ SmtManager::SmtResult SmtManager::checkDagContextFree(DagNode *dag,
                                                       ExtensionSymbol *extensionSymbol) {
     try {
         resetFormulaSize();
-        expr e = makeExpr(dag, extensionSymbol, true);
+        expr e = makeExpr(dag, extensionSymbol, false);
         Verbose("SmtCheckSymbol : Formula size " << formulaSize);
         resetFormulaSize();
         s->add(e);
