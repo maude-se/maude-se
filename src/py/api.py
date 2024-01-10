@@ -2,8 +2,8 @@ import os
 from .maude import *
 
 def smtSearch2(mo: Module, init: Term, goal: Term, 
-               cond: EqualityCondition, searchType:str, bound, sol_num, is_fold, is_merge) -> Term:
-    load('maude-se.maude')
+               cond: EqualityCondition, searchType:str, bound, sol_num, logic, is_fold, is_merge) -> Term:
+    load('smt-check.maude')
 
     meta = getModule("META-LEVEL")
     up_mo = meta.parseTerm(f"upModule(\'{mo}, false)")
@@ -30,13 +30,14 @@ def smtSearch2(mo: Module, init: Term, goal: Term,
 
     
     b = meta.parseTerm(f"\'{searchType}")
+    lo = meta.parseTerm(f"\'{logic}")
     d = "unbounded" if bound == "unbounded" else nat.parseTerm(str(bound)) 
     s_n = nat.parseTerm(str(sol_num))
 
     fold = "(true).Bool" if is_fold else "(false).Bool"
     merge = "(true).Bool" if is_merge else "(false).Bool"
 
-    cmd = metaSearchMo.parseTerm(f"metaSmtSearch2({up_mo}, {up_init}, {up_goal}, {up_cond}, {b}, {d}, {s_n}, {fold}, {merge})")
+    cmd = metaSearchMo.parseTerm(f"metaSmtSearch2({up_mo}, {up_init}, {up_goal}, {up_cond}, {b}, {d}, {s_n}, {lo}, {fold}, {merge})")
     cmd.reduce()
     return cmd
 

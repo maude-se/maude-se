@@ -7,10 +7,12 @@ from ..interface import *
 from ..util import id_gen
 
 class Cvc5Connector(Connector):
-    def __init__(self, converter: Converter):
+    def __init__(self, converter: Converter, logic=None):
         super().__init__()
         self._c = converter
         self._g = id_gen()
+
+        _logic = "ALL" if logic is None else logic
 
         # time
         self._tt = 0.0
@@ -22,7 +24,7 @@ class Cvc5Connector(Connector):
         self._s = cvc5.Solver()
         self._s.setOption("produce-models", "true")
         # self._s.setOption("produce-unsat-cores", "true")
-        self._s.setLogic("ALL")
+        self._s.setLogic(_logic)
 
         self._m = None
     

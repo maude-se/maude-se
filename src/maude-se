@@ -12,9 +12,9 @@ if __name__ == '__main__':
 
     s_help = ["set an underlying SMT solver",
               "* Supported solvers: {{{}}}".format(",".join(solvers)),
-              "* Usage: -s {}".format(default_s), "* Default: -s {}".format(default_s)]
+              "* Usage: -s {}".format(solvers[-1]), "* Default: -s {}".format(default_s)]
     
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('file', nargs='?', type=str, help="input Maude file")
     parser.add_argument("-s", "-solver", metavar="SOLVER", nargs='?', type=str,
                         help="\n".join(s_help), default=default_s)

@@ -88,9 +88,13 @@ build_src() {
 
   cd maude-bindings 
   (
-    rm -rf dist/ maude.egg-info/ _skbuild/ 
+    rm -rf dist/ maude.egg-info/ _skbuild/
     python setup.py bdist_wheel
   )
+
+  cd ..
+  rm -rf ./out
+  cp -r ./maude-bindings/dist ./out
 }
 
 # build gmp
@@ -257,8 +261,6 @@ build_maude_se() {
   build_deps
   patch_src
   build_src
-
-  cp -r ./maude-bindings/dist/* ./out
 }
 
 # Main
@@ -266,10 +268,10 @@ build_maude_se() {
 
 build_command="$1" ; shift
 case "$build_command" in
-    patch)              patch_src                 "$@" ;;
     prep)               prepare                   "$@" ;;
     deps)               build_deps                "$@" ;;
-    build)              build_src                 "$@" ;;
+    patch)              patch_src                 "$@" ;;
+    compile)            build_src                 "$@" ;;
     maude-se)           build_maude_se            "$@" ;;
     *)      echo "
     usage: $0 [prep|deps|patch|build]

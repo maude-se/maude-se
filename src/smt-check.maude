@@ -255,24 +255,24 @@ fmod META-SMT-SEARCH2 is
   var M : Module .
   vars T T' : Term .
   var COND : Condition .
-  var STEP : Qid .
+  vars STEP LOGIC : Qid .
   var B : Bound .
   var N : Nat .
   vars FOLD MERGE : Bool .
 
-  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat Bool Bool -> SmtResult? .
-  eq metaSmtSearch2(M, T, T', COND, STEP, B, N, FOLD, MERGE)
-   = metaSmtSearchInternal(transform(M), makeConstTerm(T), makeConstTerm(T'), COND, STEP, B, N, FOLD, MERGE) .
+  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat Qid Bool Bool -> SmtResult? .
+  eq metaSmtSearch2(M, T, T', COND, STEP, B, N, LOGIC, FOLD, MERGE)
+   = metaSmtSearchInternal(transform(M), makeConstTerm(T), makeConstTerm(T'), COND, STEP, B, N, LOGIC, FOLD, MERGE) .
 
-  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat -> SmtResult? .
-  eq metaSmtSearch2(M, T, T', COND, STEP, B, N)
-   = metaSmtSearch2(M, T, T', COND, STEP, B, N, false, false) .
+  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat Qid -> SmtResult? .
+  eq metaSmtSearch2(M, T, T', COND, STEP, B, N, LOGIC)
+   = metaSmtSearch2(M, T, T', COND, STEP, B, N, LOGIC, false, false) .
 
-  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat Bool -> SmtResult? .
-  eq metaSmtSearch2(M, T, T', COND, STEP, B, N, FOLD)
-   = metaSmtSearch2(M, T, T', COND, STEP, B, N, FOLD, false) .
+  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat Qid Bool -> SmtResult? .
+  eq metaSmtSearch2(M, T, T', COND, STEP, B, N, LOGIC, FOLD)
+   = metaSmtSearch2(M, T, T', COND, STEP, B, N, LOGIC, FOLD, false) .
 
-  op metaSmtSearchInternal : Module Term Term Condition Qid Bound Nat Bool Bool -> SmtResult?
+  op metaSmtSearchInternal : Module Term Term Condition Qid Bound Nat Qid Bool Bool -> SmtResult?
     [special (id-hook SpecialHubSymbol      (SmtSearchSymbol)
               op-hook failureSymbol         (failure : ~> SmtResult?)
               op-hook resultSymbol          ({_,_,_,_} : Term Substitution Term Nat ~> SmtResult))].

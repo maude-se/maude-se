@@ -55,7 +55,7 @@ class SearchHook(Hook):
       arg.reduce()
 
     # Module Term Term Condition Qid Bound Nat
-    mo, init, goal, cond, step, bound, sol, fold, merge, = term.arguments()
+    mo, init, goal, cond, step, bound, sol, logic, fold, merge, = term.arguments()
   
     self._data = data
 
@@ -88,6 +88,8 @@ class SearchHook(Hook):
 
     is_fold = "true" in str(fold)
     is_merge = "true" in str(merge)
+    
+    self.conn.set_logic(str(logic).replace("'", ""))
 
     for n, (sol, nrew, num) in enumerate(init_t.smtSearch2(searchType, goal_t, self.conn, self.conv, is_fold, is_merge, [c], max_depth)):
       

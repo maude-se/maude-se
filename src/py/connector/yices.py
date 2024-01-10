@@ -6,10 +6,12 @@ from ..interface import *
 from ..util import id_gen
 
 class YicesConnector(Connector):
-    def __init__(self, converter: Converter):
+    def __init__(self, converter: Converter, logic=None):
         super().__init__()
         self._c = converter
         self._g = id_gen()
+
+        _logic = "QF_LRA" if logic is None else logic
 
         # time
         self._tt = 0.0
@@ -19,7 +21,7 @@ class YicesConnector(Connector):
 
         # set solver
         self._cfg: Config = Config()
-        self._cfg.default_config_for_logic("QF_AUFLIA")
+        self._cfg.default_config_for_logic(_logic)
 
         self._ctx: Context = Context(self._cfg)
         self._m = None
