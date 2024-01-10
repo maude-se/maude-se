@@ -2,14 +2,14 @@ Maude-SE is an SMT extension of [Maude](https://github.com/SRI-CSL/Maude). It pr
 
 ## Building
 
-We provide a building script, `build.sh`. You can simply build Maude-SE as follows:
+We provide a building script. Use the following command to build Maude-SE:
 
 ```
 ./build.sh maude-se
 ```
 
-The script creates an `out` directory at the top directory and stores the built product (a python wheel) in it.
-Then, use the following command to install the wheel:
+The above command creates an `out` directory at the top directory and stores the built product (a python wheel) in it.
+Use the following command to install the wheel:
 ```
 pip install ./out/*.whl
 ```
