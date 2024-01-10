@@ -1,0 +1,279 @@
+fmod SATISFYING-ASSIGNMENTS is
+  pr META-LEVEL .
+
+  sort SatAssignment .
+  op _|->_ : Term Term -> SatAssignment [ctor] .
+
+  sort SatAssignmentSet .
+  subsort SatAssignment < SatAssignmentSet .
+  op empty : -> SatAssignmentSet [ctor] .
+  op _,_ : SatAssignmentSet SatAssignmentSet -> SatAssignmentSet [ctor comm assoc id: empty] .
+
+  sorts SmtCheckResult .
+  subsort Bool < SmtCheckResult .
+  op unknown : -> SmtCheckResult [ctor] .
+  op {_} : SatAssignmentSet -> SmtCheckResult [ctor] .
+endfm
+
+
+fmod META-SMT-CHECK is
+  pr SATISFYING-ASSIGNMENTS .
+
+  op metaSmtCheck : Module Term Qid -> SmtCheckResult .
+  eq metaSmtCheck(M:Module, TERM:Term, LOGIC:Qid) = metaSmtCheck(M:Module, TERM:Term, LOGIC:Qid, false) .
+
+  op metaSmtCheck : Module Term Qid Bool -> SmtCheckResult
+  [special (id-hook SpecialHubSymbol                   (SmtCheckerSymbol)
+            op-hook unknownResultSymbol                (unknown : ~> SmtCheckResult)
+            op-hook smtAssignmentResultSymbol          ({_} : SatAssignmentSet ~> SmtCheckResult)
+            op-hook emptySatAssignmentSetSymbol        (empty : ~> SatAssignmentSet)
+            op-hook concatSatAssignmentSetSymbol       (_,_ : SatAssignmentSet SatAssignmentSet ~> SatAssignmentSet)
+            op-hook assnPairSymbol                     (_|->_ : Term Term ~> SatAssignment)
+
+            term-hook builtinTrueTerm                  ((true).Bool)
+            term-hook builtinFalseTerm                 ((false).Bool)
+    )] .
+
+--- Will be supported later.
+    --- op simplifyFormula : BooleanExpr -> BooleanExpr
+    --- [special (id-hook SimplifyFormulaSymbol
+    ---           op-hook intVarSymbol                       (i : SMTVarId ~> IntegerVar)
+    ---           op-hook boolVarSymbol                      (b : SMTVarId ~> BooleanVar)
+    ---           op-hook realVarSymbol                      (r : SMTVarId ~> RealVar)
+
+    ---           op-hook integerSymbol                      (<Integers> : ~> Integer)
+    ---           op-hook realSymbol                         (<Reals> : ~> Real)
+
+    ---           term-hook trueTerm                         ((true).Boolean)
+    ---           term-hook falseTerm                        ((false).Boolean)
+
+    ---           op-hook notBoolSymbol                      (not_ : BooleanExpr ~> BooleanExpr)
+    ---           op-hook andBoolSymbol                      (_and_ : BooleanExpr BooleanExpr ~> BooleanExpr)
+    ---           op-hook xorBoolSymbol                      (_xor_ : BooleanExpr BooleanExpr ~> BooleanExpr)
+    ---           op-hook orBoolSymbol                       (_or_ : BooleanExpr BooleanExpr ~> BooleanExpr)
+    ---           op-hook impliesBoolSymbol                  (_implies_ : BooleanExpr BooleanExpr ~> BooleanExpr)
+    ---           op-hook eqBoolSymbol                       (_===_ : BooleanExpr BooleanExpr ~> BooleanExpr)
+    ---           op-hook neqBoolSymbol                      (_=/==_ : BooleanExpr BooleanExpr ~> BooleanExpr)
+    ---           op-hook iteBoolSymbol                      (_?_:_ : BooleanExpr BooleanExpr BooleanExpr ~> BooleanExpr)
+
+    ---           op-hook unaryMinusIntSymbol                (-_ : IntegerExpr ~> IntegerExpr)
+    ---           op-hook plusIntSymbol                      (_+_ : IntegerExpr IntegerExpr ~> IntegerExpr)
+    ---           op-hook minusIntSymbol                     (_-_ : IntegerExpr IntegerExpr ~> IntegerExpr)
+    ---           op-hook divIntSymbol                       (_div_ : IntegerExpr IntegerExpr ~> IntegerExpr)
+    ---           op-hook mulIntSymbol                       (_*_ : IntegerExpr IntegerExpr ~> IntegerExpr)
+    ---           op-hook modIntSymbol                       (_mod_ : IntegerExpr IntegerExpr ~> IntegerExpr)
+    ---           op-hook ltIntSymbol                        (_<_ : IntegerExpr IntegerExpr ~> BooleanExpr)
+    ---           op-hook leqIntSymbol                       (_<=_ : IntegerExpr IntegerExpr ~> BooleanExpr)
+    ---           op-hook gtIntSymbol                        (_>_ : IntegerExpr IntegerExpr ~> BooleanExpr)
+    ---           op-hook geqIntSymbol                       (_>=_ : IntegerExpr IntegerExpr ~> BooleanExpr)
+    ---           op-hook eqIntSymbol                        (_===_ : IntegerExpr IntegerExpr ~> BooleanExpr)
+    ---           op-hook neqIntSymbol                       (_=/==_ : IntegerExpr IntegerExpr ~> BooleanExpr)
+    ---           op-hook iteIntSymbol                       (_?_:_ : BooleanExpr IntegerExpr IntegerExpr ~> IntegerExpr)
+    ---           op-hook divisibleIntSymbol                 (_divisible_ : IntegerExpr IntegerExpr ~> BooleanExpr)
+
+    ---           op-hook unaryMinusRealSymbol               (-_ : RealExpr ~> RealExpr)
+    ---           op-hook plusRealSymbol                     (_+_ : RealExpr RealExpr ~> RealExpr)
+    ---           op-hook minusRealSymbol                    (_-_ : RealExpr RealExpr ~> RealExpr)
+    ---           op-hook divRealSymbol                      (_/_ : RealExpr RealExpr ~> RealExpr)
+    ---           op-hook mulRealSymbol                      (_*_ : RealExpr RealExpr ~> RealExpr)
+    ---           op-hook ltRealSymbol                       (_<_ : RealExpr RealExpr ~> BooleanExpr)
+    ---           op-hook leqRealSymbol                      (_<=_ : RealExpr RealExpr ~> BooleanExpr)
+    ---           op-hook gtRealSymbol                       (_>_ : RealExpr RealExpr ~> BooleanExpr)
+    ---           op-hook geqRealSymbol                      (_>=_ : RealExpr RealExpr ~> BooleanExpr)
+    ---           op-hook eqRealSymbol                       (_===_ : RealExpr RealExpr ~> BooleanExpr)
+    ---           op-hook neqRealSymbol                      (_=/==_ : RealExpr RealExpr ~> BooleanExpr)
+    ---           op-hook iteRealSymbol                      (_?_:_ : BooleanExpr RealExpr RealExpr ~> Real)
+    ---           op-hook toRealSymbol                       (toReal : IntegerExpr ~> RealExpr)
+    ---           op-hook toIntegerSymbol                    (toInteger : RealExpr ~> IntegerExpr)
+    ---           op-hook isIntegerSymbol                    (isInteger : RealExpr ~> BooleanExpr)
+    --- )] .
+
+    --- op simplifyFormula : IntegerExpr -> IntegerExpr
+    --- [special (id-hook SimplifyFormulaSymbol
+    ---           op-hook shareWith                          (simplifyFormula : BooleanExpr ~> BooleanExpr)
+    --- )] .
+
+    --- op simplifyFormula : RealExpr -> RealExpr
+    --- [special (id-hook SimplifyFormulaSymbol
+    ---           op-hook shareWith                          (simplifyFormula : BooleanExpr ~> BooleanExpr)
+    --- )] .
+endfm
+
+fmod ABST-BUILTIN is
+  protecting META-LEVEL .
+  protecting CONVERSION .
+
+  sort TermAbstraction .
+  op {_,_,_} : TermList Condition Nat -> TermAbstraction [ctor format (b! o d d d d b! o)] .
+  
+  var M : Module .
+  var N N' N'' : Nat .
+  var F : Qid .
+  var TY : Type .
+  var TYS : TypeSet .
+  var C : Constant .
+  vars CD CD' : Condition .
+  vars V NV : Variable .
+  var T : Term .
+  vars TL TL' : TermList .
+  vars NTL : NeTermList .
+
+  op abst : Module TermList Nat -> TermAbstraction [format (r! o)] .
+
+  eq abst(M, V, N) = {V, nil, 0} .
+
+  ceq abst(M, T, N) = {NV, NV = T, 1}
+  if not T :: Variable
+  /\ TY := leastSort(M,T)
+  /\ TY in ('Boolean ; 'Integer ; 'Real)
+  /\ NV := auxVarGen(N, TY) . 
+
+  ceq abst(M, C, N) = {C, nil, 0}
+  if TY := leastSort(M, C)
+  /\ not TY in ('Boolean ; 'Integer ; 'Real) .
+
+  ceq abst(M, F[TL], N) = {F[TL'], CD, N'}
+  if TY := leastSort(M,F[TL])
+  /\ not TY in ('Boolean ; 'Integer ; 'Real)
+  /\ {TL', CD, N'} := abst(M, TL, N) .
+
+  ceq abst(M, (T, NTL), N) = {(TL,TL'), CD /\ CD', N' + N''}
+  if { TL, CD, N' } := abst(M, T, N)
+  /\ { TL', CD', N'' } := abst(M, NTL, N + N') .
+
+  eq abst(M, empty, N) = {empty, nil, 0} .
+
+
+*** aux functions
+*** An input TY is assumed to be a builtin sort
+*** while the output sort is extende type.
+  op auxVarGen : Nat Type -> Variable .
+  eq auxVarGen(N, TY) = qid("V" + string(N, 10) + ":" + string(TY)) .
+endfm
+
+fmod TRANSFORMATION is
+  inc ABST-BUILTIN .
+  pr CONVERSION .
+
+  sort TranslateResult .
+  op {_,_} : Rule Nat -> TranslateResult [ctor] .
+
+  vars TY TY' : Type .
+  var TYS : TypeSet .
+  var M : Module .
+  vars L' R' : Term .
+  var COND : EqCondition .
+  var ATTR : AttrSet .
+  vars TL TL' : TermList .
+  vars N N' N'' : Nat .
+  vars T T' : Term .
+  var RS RS' : RuleSet .
+  vars RU RU' : Rule .
+  vars CD CD' : EqCondition .
+
+*** For theroy transformation
+  var H : Header .
+  var IL : ImportList .
+  var SS : SortSet .
+  var SSDS : SubsortDeclSet .
+  var OPDS : OpDeclSet .
+  var MAS : MembAxSet .
+  var EQS : EquationSet .
+  vars RLS RLS' : RuleSet .
+
+--- Least rule sort
+
+  op leastRuleSort : Module RuleSet -> TypeSet .
+  eq leastRuleSort (M, none) = none . 
+  eq leastRuleSort (M, crl T => T' if CD [ATTR] . RS) = leastSort(M, T) ; leastSort(M, T') ; leastRuleSort(M, RS) .
+  eq leastRuleSort (M,  rl T => T'       [ATTR] . RS) = leastSort(M, T) ; leastSort(M, T') ; leastRuleSort(M, RS) .
+
+  op maxRuleSort : Module Type TypeSet -> Type .
+  eq maxRuleSort (M, TY, none) = TY .
+  ceq maxRuleSort (M, TY, TYS) = 
+    if sortLeq(M, TY, TY') then TY'
+    else TY fi
+  if TY' := maxRuleSort(M, TYS) .
+  
+  op maxRuleSort : Module TypeSet -> Type .
+  eq maxRuleSort (M, TY ; TYS) = maxRuleSort(M, TY, TYS) .
+
+  op toTermList : EqCondition -> TermList .
+  eq toTermList(nil) = 'true.Boolean .
+  eq toTermList(T = T') = '_===_[T, T'] .
+  eq toTermList(CD /\ CD') = '_and_[toTermList(CD), toTermList(CD')] .
+
+  op incCounter : Term Nat -> Term .
+  eq incCounter(T, 0) = T .
+  eq incCounter(T, N) = '_+_[T, upTerm(N)] [owise] .
+
+  op normRule : Rule -> Rule .
+  eq normRule(crl T => T' if nil [ATTR].) = rl T => T' [ATTR]. .
+  eq normRule(RU) = RU [owise] .
+
+
+  op trRule : Module Rule Nat -> TranslateResult . 
+  ceq trRule (M, crl T => T' if COND [ATTR]., N) =
+  	{ normRule(rl '`[_`][L'] => 
+    '`[_|_`]['`[_`][R'],'_and_['_and_[toTermList(CD), toTermList(COND)], toTermList(CD')]] [nonexec ATTR].), N'' }
+  if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N').
+
+
+  ceq trRule (M, rl T => T' [ATTR]., N) =
+    { normRule(rl '`[_`][L'] => 
+    '`[_|_`]['`[_`][R'], '_and_[toTermList(CD), toTermList(CD')]] [nonexec ATTR].), N''} 
+    if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N') .
+
+  op tr : Module RuleSet Nat -> RuleSet .
+  eq tr (M, none, N) = none .
+  ceq tr (M, RU RS, N) = RU' tr(M, RS, N + N') 
+  if { RU' , N' } := trRule(M, RU, N) .
+
+--- TODO: need to add fmod, smod
+
+  op replaceRule : Module RuleSet Type ~> Module .
+  eq replaceRule(mod H is IL sorts SS . SSDS OPDS MAS EQS RLS endm, RLS', TY)
+    = mod H is IL sorts ('$constTerm ; SS ) . SSDS
+	    (op '`[_|_`] : '$constTerm 'Boolean -> '$constTerm [ctor] . 
+       op '`[_`] : TY -> '$constTerm [ctor] . OPDS) MAS EQS RLS' endm .
+
+  op transform : Module -> Module .
+  ceq transform(M) = replaceRule(M, RS', TY)
+  if RS := getRls(M) 
+  /\ TYS := leastRuleSort(M, RS)
+  /\ TY := maxRuleSort(M, TYS)
+  /\ RS' := tr(M, RS, 0) .
+
+  op makeConstTerm : Term -> Term .
+  eq makeConstTerm(T) = '`[_`][T] .
+
+endfm
+
+fmod META-SMT-SEARCH2 is
+  pr TRANSFORMATION .
+
+  var M : Module .
+  vars T T' : Term .
+  var COND : Condition .
+  var STEP : Qid .
+  var B : Bound .
+  var N : Nat .
+  vars FOLD MERGE : Bool .
+
+  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat Bool Bool -> SmtResult? .
+  eq metaSmtSearch2(M, T, T', COND, STEP, B, N, FOLD, MERGE)
+   = metaSmtSearchInternal(transform(M), makeConstTerm(T), makeConstTerm(T'), COND, STEP, B, N, FOLD, MERGE) .
+
+  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat -> SmtResult? .
+  eq metaSmtSearch2(M, T, T', COND, STEP, B, N)
+   = metaSmtSearch2(M, T, T', COND, STEP, B, N, false, false) .
+
+  op metaSmtSearch2 : Module Term Term Condition Qid Bound Nat Bool -> SmtResult? .
+  eq metaSmtSearch2(M, T, T', COND, STEP, B, N, FOLD)
+   = metaSmtSearch2(M, T, T', COND, STEP, B, N, FOLD, false) .
+
+  op metaSmtSearchInternal : Module Term Term Condition Qid Bound Nat Bool Bool -> SmtResult?
+    [special (id-hook SpecialHubSymbol      (SmtSearchSymbol)
+              op-hook failureSymbol         (failure : ~> SmtResult?)
+              op-hook resultSymbol          ({_,_,_,_} : Term Substitution Term Nat ~> SmtResult))].
+endfm

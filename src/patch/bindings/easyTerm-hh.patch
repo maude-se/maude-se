@@ -1,0 +1,17 @@
+20a21
+> #include "Python.h"
+186a188,194
+> 	RewriteSmtSequenceSearch* smtSearch2(SearchType type,
+> 			EasyTerm* target, PyObject* connector, PyObject* converter, 
+>           bool fold = true, bool merge = false,
+> 			const Vector<ConditionFragment*> &condition = NO_CONDITION,
+> 			int depth = -1);
+> 
+> 
+434a443,448
+> 
+> 
+> EasyTerm* dag2term(PyObject* capsuleObj);
+> 
+> PyObject* term2dag(EasyTerm* term);
+> 

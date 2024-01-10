@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+import os
+import argparse
+import maudeSE.maude
+from maudeSE.factory import *
+from maudeSE.hook.check import *
+from maudeSE.hook.search import *
+
+if __name__ == '__main__':
+    solvers = ["z3","yices","cvc5"]
+    default_s = solvers[0]
+
+    s_help = ["set an underlying SMT solver",
+              "* Supported solvers: {{{}}}".format(",".join(solvers)),
+              "* Usage: -s {}".format(default_s), "* Default: -s {}".format(default_s)]
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('file', nargs='?', type=str, help="input Maude file")
+    parser.add_argument("-s", "-solver", metavar="SOLVER", nargs='?', type=str,
+                        help="\n".join(s_help), default=default_s)
+    args = parser.parse_args()
+
+    try:
+        # initialize Maude interpreter
+
+        maudeSE.maude.init(advise=False)
+
+        # instantiate our interface
+        conv, conn = Factory().create(args.s)
+
+        # register special hooks
+        hook = CheckHook(conn, conv)
+        maudeSE.maude.connectEqHook('SmtCheckerSymbol', hook)
+
+        searchHook = SearchHook(conn, conv)
+        maudeSE.maude.connectEqHook('SmtSearchSymbol', searchHook)
+
+        # load preludes
+
+        maudeSE.maude.load('smt.maude')
+        maudeSE.maude.load('smt-check.maude')
+
+        # load an input file
+
+        if args.file is None:
+            raise ValueError("should provide an input Maude file")
+        
+        maudeSE.maude.load(args.file)
+
+    except ValueError as err:
+        print("error: {}".format(err))

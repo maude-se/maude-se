@@ -1,0 +1,62 @@
+23a24
+> #include "rewriteSmtSequenceSearch.hh"
+50a52,53
+> #include <sstream>
+> 
+537a541,577
+> RewriteSmtSequenceSearch*
+> EasyTerm::smtSearch2(SearchType type,
+> 		 EasyTerm* target, PyObject* connector, PyObject* converter, bool fold, bool merge,
+> 		 const Vector<ConditionFragment*> &condition,
+> 		 int depth)
+> {
+> 	if (this == target) {
+> 		IssueWarning("the target of the search cannot be the initial term itself.");
+> 		return nullptr;
+> 	}
+> 
+> 	VisibleModule* vmod = dynamic_cast<VisibleModule*>(symbol()->getModule());
+> 	startUsingModule(vmod);
+> 
+> 	const SMT_Info& smtInfo = vmod->getSMT_Info();
+> 	VariableGenerator* vg = new VariableGenerator(smtInfo);
+> 
+> 	// SequenceSearch takes an ownership of the condition, so we need to pass them a copy.
+> 	Vector<ConditionFragment*> conditionCopy;
+> 	ImportModule::deepCopyCondition(nullptr, condition, conditionCopy);
+> 
+> 	Pattern* pattern = new Pattern(target->termCopy(), false, conditionCopy);
+> 
+> 	if (target->is_dag)
+> 		target->termify();
+> 
+> 	RewriteSmtSequenceSearch* state =
+> 	new RewriteSmtSequenceSearch(new UserLevelRewritingContext(getDag()),
+> 				      static_cast<RewriteSequenceSearch::SearchType>(type),
+> 				      pattern,
+> 				      smtInfo,
+> 				      vg, new FreshVariableSource(vmod), connector, converter, fold, merge,
+> 				      depth,
+> 					  0);
+> 	return state;
+> }
+> 
+860a901,918
+> }
+> 
+> 
+> EasyTerm* dag2term(PyObject* capsuleObj) {
+> 	// void* obj = PyCapsule_GetPointer(capsuleObj, NULL);
+> 
+> 	// DagNode* dag = (DagNode*)(obj);
+> 	// Term* term = dag->symbol()->termify(dag);
+> 	// return obj != nullptr ? new EasyTerm(term) : nullptr;
+> 	void* obj = PyCapsule_GetPointer(capsuleObj, NULL);
+>   // delete a reference on a capsule object
+>   Py_DECREF(capsuleObj);
+> 	return obj != nullptr ? new EasyTerm((DagNode*)(obj)) : nullptr;
+> }
+> 
+> 
+> PyObject* term2dag(EasyTerm* term) {
+> 	return PyCapsule_New((void*)term->getDag(), NULL, NULL);

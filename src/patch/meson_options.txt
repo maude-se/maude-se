@@ -1,0 +1,11 @@
+option('with-smt', type: 'combo', choices: ['cvc4', 'yices2', 'no'], value: 'cvc4', description: 'use CVC4 or Yices2 as SMT solver library')
+option('with-readline', type: 'feature', description: 'use GNU readline command line editing library')
+option('with-sigsegv', type: 'feature', description: 'use GNU libsigsegv library')
+option('enable-compiler', type: 'boolean', value: false, description: 'build the experimental integrated compiler')
+option('enable-debug', type: 'boolean', value: false, description: 'no optimization, runtime checks, dump routines')
+option('extra-include-dirs', type: 'array', value: [], description: 'additional include directories')
+option('extra-lib-dirs', type: 'array', value: [], description: 'additional directories where to look for libraries')
+option('with-ltsmin', type: 'feature', value: 'enabled', description: 'build a language module for LTSmin')
+option('with-simaude', type: 'feature', value: 'enabled', description: 'build the statistical simulator tool')
+option('static-libs', type: 'array', value: ['buddy', 'gmp', 'readline', 'sigsegv', 'yices2', 'cvc4', 'popt'], choices: ['buddy', 'gmp', 'readline', 'sigsegv', 'yices2', 'cvc4', 'popt'],
+       description: 'libraries to be linked statically')

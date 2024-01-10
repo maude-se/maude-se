@@ -1,0 +1,16 @@
+158a159,173
+> 
+> %extend RewriteSmtSequenceSearch {
+> %pythoncode %{
+> 	def __iter__(self):
+> 		return self
+> 
+> 	def __next__(self):
+> 		term = self.__next()
+> 		if term is None:
+> 			raise StopIteration
+> 		return term, self.getRewriteCount(), self.getStateNr()
+> %}
+> }
+> 
+> 

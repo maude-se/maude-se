@@ -1,0 +1,12 @@
+58a59
+>       SMT_SEARCH2,
+335a337,345
+> 
+> 
+>   void doRewriteSmtSearching(Timer& timer,
+> 		   VisibleModule* module,
+> 		   RewriteSmtSequenceSearch* state,
+> 		   Int64 solutionCount,
+> 		   Int64 limit);
+>   void rewriteSmtSearchCont(Int64 limit, bool debug);
+> 

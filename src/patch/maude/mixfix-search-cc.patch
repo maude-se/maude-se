@@ -1,0 +1,21 @@
+28a29
+> #include "rewriteSmtSequenceSearch.hh"
+32a34
+> #include "rewriteSmtSearch.cc"
+192c194
+< 	  "smt-search", "vu-narrow", "fvu-narrow"};
+---
+> 	  "smt-search", "smt-search2", "vu-narrow", "fvu-narrow"};
+280a283,294
+>     }
+>   else if (searchKind == SMT_SEARCH2)
+>     {
+>         const SMT_Info& smtInfo = fm->getSMT_Info();
+>               VariableGenerator* vg = new VariableGenerator(smtInfo);
+>       RewriteSmtSequenceSearch* state =
+> 	new RewriteSmtSequenceSearch(new UserLevelRewritingContext(subjectDag),
+> 				  static_cast<RewriteSequenceSearch::SearchType>(searchType),
+> 				  pattern, smtInfo, vg, new FreshVariableSource(fm), nullptr, nullptr, true, false,
+> 				  depth);
+>       Timer timer(getFlag(SHOW_TIMING));
+>       doRewriteSmtSearching(timer, fm, state, 0, limit);

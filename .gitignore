@@ -1,0 +1,6 @@
+.idea/
+.deps/
+.vscode/
+.DS_Store
+maude-bindings/
+out/
