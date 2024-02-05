@@ -91,14 +91,21 @@ class SearchHook(Hook):
     
     self.conn.set_logic(str(logic).replace("'", ""))
 
-    for n, (sol, nrew, num) in enumerate(init_t.smtSearch2(searchType, goal_t, self.conn, self.conv, is_fold, is_merge, [c], max_depth)):
-      
-      if n == sol_num:
+    for n, (sol, const, nrew, num) in enumerate(init_t.smtSearch2(searchType, goal_t, self.conn, self.conv, is_fold, is_merge, [c], max_depth)):
+      cur_n = n + 1
+
+      # already exceed
+      if cur_n > sol_num:
+        break
+
+      if cur_n == sol_num:
         # print(sol, " with ", nrew)
         # print("  # state explored : " + str(num))
         subst_t, subst = self._make_assn(symbol_mo)
         s_t, = sol.arguments()
 
+        # print("where")
+        # print(self.conv.term2dag(const))
         return self._get_symbol("success").makeTerm([symbol_mo.upTerm(s_t), subst_t, symbol_mo.upTerm(subst.instantiate(s_t)), symbol_mo.parseTerm(f"({num}).Nat")])
 
       # if n >= max_num - 1:

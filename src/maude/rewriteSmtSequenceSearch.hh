@@ -36,7 +36,6 @@ public:
 private:
   int findNextInterestingState();
 
-  DagNode *makeAbstBuiltin(DagNode *dag, DagNode **goalAbstConstDag, RewritingContext *initial);
   PyObject *goalAbstConst;
   PyObject *finalConstraint;
 
@@ -69,6 +68,8 @@ private:
   bool normalFormNeeded;
   MatchSearchState *matchState;
   int stateNr;
+
+  double time;
 };
 
 inline const Pattern *

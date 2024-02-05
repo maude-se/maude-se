@@ -2,5 +2,6 @@
 .deps/
 .vscode/
 .DS_Store
+.python-version
 maude-bindings/
 out/

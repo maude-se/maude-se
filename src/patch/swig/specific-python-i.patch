@@ -9,7 +9,7 @@
 > 		term = self.__next()
 > 		if term is None:
 > 			raise StopIteration
-> 		return term, self.getRewriteCount(), self.getStateNr()
+> 		return term, self.getStateConst(self.getStateNr()), self.getRewriteCount(), self.getStateNr()
 > %}
 > }
 > 

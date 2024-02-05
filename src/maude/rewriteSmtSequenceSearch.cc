@@ -28,6 +28,7 @@
 #include "freshVariableSource.hh"
 #include "token.hh"
 #include "equalityConditionFragment.hh" // for printing purpose ...
+#include <ctime>
 
 RewriteSmtSequenceSearch::RewriteSmtSequenceSearch(RewritingContext *initial,
                                                    SearchType searchType,
@@ -43,21 +44,7 @@ RewriteSmtSequenceSearch::RewriteSmtSequenceSearch(RewritingContext *initial,
       goal(goal),
       maxDepth((searchType == ONE_STEP) ? 1 : maxDepth)
 {
-  // newVariableNumber = avoidVariableNumber;
-  // Verbose("make new goal " << goal->getLhs()->term2Dag());
-  DagNode *goalAbst = smtInfo.getTrueSymbol()->makeDagNode();
-  DagNode *newGoal = makeAbstBuiltin(goal->getLhs()->term2Dag(), &goalAbst, initial);
-
-  goalAbstConst = convDag2Term(goalAbst);
-
-  Term *newGoalTerm = newGoal->symbol()->termify(newGoal);
-  Verbose("abst const " << goalAbst);
-  Verbose("make new goal " << newGoalTerm);
-  trueGoal = new Pattern(newGoalTerm, false);
-
-  PyObject *goalAbstConstStr = PyObject_Repr(goalAbstConst);
-  const char *gS = PyUnicode_AsUTF8(goalAbstConstStr);
-  Verbose("python const " << gS);
+  trueGoal = new Pattern(goal->getLhs(), false);
 
   initState->constTermIndex = consTermSeen[initState->hashConsIndex].size();
   DagNode *initConst = makeConstraintFromCondition(goal->getCondition());
@@ -87,6 +74,8 @@ RewriteSmtSequenceSearch::RewriteSmtSequenceSearch(RewritingContext *initial,
   reachingInitialStateOK = (searchType == AT_LEAST_ONE_STEP || searchType == ONE_STEP);
   normalFormNeeded = (searchType == NORMAL_FORM);
   nextArc = NONE;
+
+  time = 0.0;
 }
 
 RewriteSmtSequenceSearch::~RewriteSmtSequenceSearch()
@@ -138,109 +127,6 @@ void RewriteSmtSequenceSearch::markReachableNodes()
   //   finalConstraint->mark();
 }
 
-DagNode *RewriteSmtSequenceSearch::makeAbstBuiltin(DagNode *dag, DagNode **goalAbstConstDag, RewritingContext *initial)
-{
-  // some type of constant dag nodes can return null
-  // e.g., FreeDagNode
-  RawDagArgumentIterator *arg = dag->arguments();
-  if (arg == nullptr)
-  {
-    dag->computeTrueSort(*initial);
-    Sort *dag_sort = dag->getSort();
-    SMT_Info::SMT_Type type = smtInfo.getType(dag_sort);
-    if (type != SMT_Info::NOT_SMT)
-    {
-      Symbol *baseVariableSymbol = freshVariableGenerator->getBaseVariableSymbol(dag_sort);
-
-      string newNameString = "#newVar$";
-      char *name = mpz_get_str(0, 10, newVariableNumber.get_mpz_t());
-      newNameString += name;
-      free(name);
-      int newId = Token::encode(newNameString.c_str());
-      DagNode *newVariable = new VariableDagNode(baseVariableSymbol, newId, NONE);
-      newVariable->computeTrueSort(*initial);
-
-      ++newVariableNumber;
-
-      Symbol *eqOp = smtInfo.getEqualityOperator(dag, newVariable);
-      if (eqOp == 0)
-      {
-        IssueWarning(dag << ": no SMT equality operator available for this type");
-      }
-      Vector<DagNode *> args(2);
-      args[0] = dag;
-      args[1] = newVariable;
-      DagNode *eqConst = eqOp->makeDagNode(args);
-
-      Vector<DagNode *> args2(2);
-      args2[0] = *goalAbstConstDag;
-      args2[1] = eqConst;
-      *goalAbstConstDag = smtInfo.getConjunctionOperator()->makeDagNode(args2);
-
-      return newVariable;
-    }
-    else
-    {
-      return dag;
-    }
-  }
-  else
-  {
-    Vector<DagNode *> newChild;
-    while (arg->valid())
-    {
-      DagNode *lhs = arg->argument();
-      lhs->computeTrueSort(*initial);
-      // Verbose("call this " << lhs << ": " << lhs->getSort());
-      // check SMT sort
-      Sort *lhs_sort = lhs->getSort();
-      SMT_Info::SMT_Type type = smtInfo.getType(lhs_sort);
-      if (type != SMT_Info::NOT_SMT)
-      {
-        // make a new fresh variable
-
-        Symbol *baseVariableSymbol = freshVariableGenerator->getBaseVariableSymbol(lhs_sort);
-
-        string newNameString = "#newVar$";
-        char *name = mpz_get_str(0, 10, newVariableNumber.get_mpz_t());
-        newNameString += name;
-        free(name);
-        int newId = Token::encode(newNameString.c_str());
-        DagNode *newVariable = new VariableDagNode(baseVariableSymbol, newId, NONE);
-        newVariable->computeTrueSort(*initial);
-
-        Verbose("      new variable " << newVariable);
-        // delete freshVariableSource;
-        ++newVariableNumber;
-
-        Symbol *eqOp = smtInfo.getEqualityOperator(lhs, newVariable);
-        if (eqOp == 0)
-        {
-          IssueWarning(lhs << ": no SMT equality operator available for this type");
-          continue;
-        }
-        Vector<DagNode *> args(2);
-        args[0] = lhs;
-        args[1] = newVariable;
-        DagNode *eqConst = eqOp->makeDagNode(args);
-
-        Vector<DagNode *> args2(2);
-        args2[0] = *goalAbstConstDag;
-        args2[1] = eqConst;
-        *goalAbstConstDag = smtInfo.getConjunctionOperator()->makeDagNode(args2);
-        newChild.append(newVariable);
-      }
-      else
-      {
-        newChild.append(makeAbstBuiltin(lhs, goalAbstConstDag, initial));
-      }
-      arg->next();
-    }
-
-    return dag->symbol()->makeDagNode(newChild);
-  }
-}
-
 bool RewriteSmtSequenceSearch::findNextMatch()
 {
   if (matchState != 0)
@@ -248,22 +134,27 @@ bool RewriteSmtSequenceSearch::findNextMatch()
 
   for (;;)
   {
+    {
+    clock_t start = clock();
     stateNr = findNextInterestingState();
+    clock_t end = clock();
+
+    time += (double)(end - start);
+    }
     if (stateNr == NONE)
       break;
 
-    Verbose("\n");
-    Verbose("  goal original : " << goal->getLhs() << " (" << trueGoal->getLhs() << ") which should match with " << getStateDag(stateNr) << " index : " << stateNr);
+    { // To avoid "jump_to_label error", we wrap this block
+      DagNode* stateDag = getStateDag(stateNr);
 
-    for (ConditionFragment *cf : goal->getCondition())
-    {
-      EqualityConditionFragment *ag = dynamic_cast<EqualityConditionFragment *>(cf);
-      Verbose("  " << ag->getLhs() << " = " << ag->getRhs());
+      Verbose("\n");
+      Verbose("  goal original : " << trueGoal->getLhs() << " which should match with " << stateDag << " index : " << stateNr);
+
+      matchState = new MatchSearchState(getContext()->makeSubcontext(stateDag),
+                                        trueGoal,
+                                        MatchSearchState::GC_CONTEXT);
     }
 
-    matchState = new MatchSearchState(getContext()->makeSubcontext(getStateDag(stateNr)),
-                                      trueGoal,
-                                      MatchSearchState::GC_CONTEXT);
   tryMatch:
     bool foundMatch = matchState->findNextMatch();
 
@@ -272,6 +163,11 @@ bool RewriteSmtSequenceSearch::findNextMatch()
     if (foundMatch && checkMatchConstraint(stateNr))
     {
       Verbose("goal sat with final constraint");
+      // cout << "time took : " << time / CLOCKS_PER_SEC << endl;
+      // cout << "get next state time : " << nextTime / CLOCKS_PER_SEC << endl;
+      // cout << "match rewrite time : " << rewriteTime / CLOCKS_PER_SEC << endl;
+      // cout << "else time : " << elseTime / CLOCKS_PER_SEC << endl;
+
       return true;
     }
 
@@ -358,7 +254,7 @@ int RewriteSmtSequenceSearch::findNextInterestingState()
       return explore;
     }
   }
-
+  // cout << "reach end " << endl;
   return NONE;
 }
 
@@ -400,10 +296,10 @@ bool RewriteSmtSequenceSearch::checkMatchConstraint(int stateNr)
   Vector<DagNode *> args(2);
   const Substitution *substitution = matchState->getContext();
   DagNode *matchConstraint = 0;
-  for (auto &i : smtVarDags)
-  {
-    Verbose("smtVarDags " << i.first << " : " << i.second);
-  }
+  // for (auto &i : smtVarDags)
+  // {
+  //   Verbose("smtVarDags " << i.first << " : " << i.second);
+  // }
 
   for (auto &i : smtVarDags)
   {
@@ -429,25 +325,25 @@ bool RewriteSmtSequenceSearch::checkMatchConstraint(int stateNr)
       args[1] = equalityConstraint;
       matchConstraint = smtInfo.getConjunctionOperator()->makeDagNode(args);
     }
-    Verbose("matchConstraint: " << matchConstraint);
   }
 
   if (matchConstraint != 0)
   {
-    PyObject *matchTerm = convDag2Term(matchConstraint);
+    Verbose("matchConstraint: " << matchConstraint);
+    PyObject* matchTerm = convDag2Term(matchConstraint);
     ConstrainedTerm *constrained = consTermSeen[seen[stateNr]->hashConsIndex][seen[stateNr]->constTermIndex];
     PyObject *pyConst = constrained->constraint;
 
-    PyObject *goalAbstConstStr = PyObject_Repr(goalAbstConst);
-    const char *gS = PyUnicode_AsUTF8(goalAbstConstStr);
-    Verbose("python const " << gS);
-
-    PyObject *check_sat_r = PyObject_CallMethodObjArgs(connector, check_sat, pyConst, matchTerm, goalAbstConst, NULL);
+    PyObject *check_sat_r = PyObject_CallMethodObjArgs(connector, check_sat, pyConst, matchTerm, NULL);
     if (check_sat_r != nullptr)
     {
       if (PyObject_RichCompareBool(check_sat_r, Py_True, Py_EQ) <= 0)
       {
         return false;
+      } 
+      else 
+      {
+          constrained->constraint = PyObject_CallMethodObjArgs(connector, add_const, constrained->constraint, matchTerm, NULL);
       }
     }
     else

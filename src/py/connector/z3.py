@@ -137,7 +137,7 @@ class Z3Connector(Connector):
     def get_model(self):
         model_dict = dict()
         for d in self._m.decls():
-            model_dict[d] = self._m[d]
+            model_dict[(d, None, None)] = (self._m[d], None, None)
 
         return model_dict
     

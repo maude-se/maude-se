@@ -112,6 +112,9 @@ SmtStateTransitionGraph::SmtStateTransitionGraph(RewritingContext *initial,
 	int idx;
 	stateCollection.insertState(counter, initial->root(), NONE, &idx);
 	counter++;
+
+	nextTime = 0.0;
+	rewriteTime = 0.0;
 }
 
 SmtStateTransitionGraph::~SmtStateTransitionGraph()
@@ -140,6 +143,8 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 		return n->nextStates[index];
 	if (n->fullyExplored)
 		return NONE;
+
+	clock_t start = clock();
 	if (n->rewriteState == 0)
 	{
 		DagNode *canonicalStateDag = consTermSeen[n->hashConsIndex][n->constTermIndex]->dag;
@@ -164,22 +169,21 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 	// DagNode* dndp;
 	//   stateCollection.getState(n->hashConsIndex, dndp);
 
-	ConstrainedTerm *constrained = consTermSeen[n->hashConsIndex][n->constTermIndex];
-	PyObject *objectsRepresentation = PyObject_Repr(constrained->constraint);
-	// const char* ss = PyString_AsString(objectsRepresentation);
-	const char *ss = PyUnicode_AsUTF8(objectsRepresentation);
+	// ConstrainedTerm *constrained = consTermSeen[n->hashConsIndex][n->constTermIndex];
+	// PyObject *objectsRepresentation = PyObject_Repr(constrained->constraint);
+	// const char *ss = PyUnicode_AsUTF8(objectsRepresentation);
 
-	const void *address = static_cast<const void *>(constrained->dag);
-	std::stringstream strs;
-	strs << address;
-	string adrId = strs.str();
-	Verbose("  try to find next state of " << n->hashConsIndex << " and const # " << n->constTermIndex);
-	Verbose("  dag : ");
-	Verbose("  " << constrained->dag);
-	Verbose("  address : ");
-	Verbose("  " << adrId.c_str());
-	Verbose("  const : ");
-	Verbose("  " << ss);
+	// const void *address = static_cast<const void *>(constrained->dag);
+	// std::stringstream strs;
+	// strs << address;
+	// string adrId = strs.str();
+	// Verbose("  try to find next state of " << n->hashConsIndex << " and const # " << n->constTermIndex);
+	// Verbose("  dag : ");
+	// Verbose("  " << constrained->dag);
+	// Verbose("  address : ");
+	// Verbose("  " << adrId.c_str());
+	// Verbose("  const : ");
+	// Verbose("  " << ss);
 
 	RewriteSmtSearchState *rewriteState = n->rewriteState;
 	RewritingContext *context = rewriteState->getContext();
@@ -189,7 +193,11 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 	{
 		Verbose("    nrNextStates " << nrNextStates << ", index : " << index);
 		Verbose("  - searching depth : " << n->depth + 1);
+		clock_t r_s = clock();
 		bool success = rewriteState->findNextRewrite();
+		clock_t e_s = clock();
+
+		rewriteTime += (double)(e_s - r_s);
 		rewriteState->transferCountTo(*initial);
 
 		Verbose("    found next rewrite? " << success);
@@ -287,7 +295,6 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 					newState->avoidVariableNumber = n->rewriteState->getMaxVariableNumber();
 					newState->dag = c1;
 					newState->depth = n->depth + 1;
-					newState->dag->mark();
 
 					PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
 					if (next == nullptr)
@@ -545,11 +552,14 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 			n->nextStates.append(nextState);
 			n->fwdArcs[nextState].insert(rule);
 			++nrNextStates;
+			// cout << "next reeady" << endl;
 			//
 			//	If we didn't do any equational rewriting we will not have had a chance to
 			//	collect garbage.
 			//
 			MemoryCell::okToCollectGarbage();
+
+			// cout << "after garbage" << endl;
 		}
 		else
 		{
@@ -557,9 +567,14 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 			delete rewriteState;
 			n->fullyExplored = true;
 			n->rewriteState = 0;
+
+			clock_t end = clock();
+			nextTime += (double)(end - start);
 			return NONE;
 		}
 	}
+	clock_t end = clock();
+	nextTime += (double)(end - start);
 	return n->nextStates[index];
 }
 

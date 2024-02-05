@@ -71,6 +71,13 @@ public:
 			bool hasNext = $self->findNextMatch();
 			return hasNext ? new EasyTerm($self->getStateDag($self->getStateNr())) : nullptr;
 		}
+
+		/**
+		 * Get the number of rewrites until this term has been found.
+		 */
+		PyObject* getStateConst(int stateNr) {
+			return $self->getStateConst(stateNr);
+		}
 	}
 
 	/**

@@ -215,19 +215,14 @@ bool RewriteSmtSearchState::initSubstitution(const VariableInfo &varInfo)
         Symbol *baseSymbol = varInfo.index2Variable(k)->symbol();
 
         string newNameString = "#ubVar$";
-        string newNameString2 = "!ubVar$";
         char *name = mpz_get_str(0, 10, newVariableNumber.get_mpz_t());
         newNameString += name;
-        newNameString2 += name;
         free(name);
         int newId = Token::encode(newNameString.c_str());
-        int newId2 = Token::encode(newNameString2.c_str());
+        
         DagNode *v = new VariableDagNode(baseSymbol, newId, NONE);
-        DagNode *v2 = new VariableDagNode(baseSymbol, newId2, NONE);
-        // int name = freshVariableGenerator->getFreshVariableName(k, 0);
-        // VariableDagNode* v = new VariableDagNode(baseSymbol, name, newVariableNumber);
+        v->computeTrueSort(*context);
         context->bind(k, v);
-        mapping.insert(Mapping::value_type(v, v2));
         Verbose("      unbound Variable " << varInfo.index2Variable(k) << " is bound to " << (DagNode *)v);
       }
     }

@@ -53,7 +53,7 @@ class Cvc5Connector(Connector):
 
         model_dict = dict()
         for v in _vars:
-            model_dict[v] = self._s.getValue(v)
+            model_dict[(v, None, None)] = (self._s.getValue(v), None, None)
         
         return model_dict
     

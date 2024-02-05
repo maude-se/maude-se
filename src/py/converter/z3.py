@@ -183,7 +183,8 @@ class Z3Converter(Converter):
         return self._func_dict[key]
     
     def term2dag(self, term):
-        return self._module.parseTerm(self._term2dag(term))
+        t, _, _ = term
+        return self._module.parseTerm(self._term2dag(t))
 
     def _term2dag(self, term):
         # variable or function

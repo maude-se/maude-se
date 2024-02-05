@@ -122,15 +122,16 @@ fmod ABST-BUILTIN is
 
   eq abst(M, V, N) = {V, nil, 0} .
 
-  ceq abst(M, T, N) = {NV, NV = T, 1}
-  if not T :: Variable
-  /\ TY := leastSort(M,T)
-  /\ TY in ('Boolean ; 'Integer ; 'Real)
-  /\ NV := auxVarGen(N, TY) . 
-
   ceq abst(M, C, N) = {C, nil, 0}
   if TY := leastSort(M, C)
   /\ not TY in ('Boolean ; 'Integer ; 'Real) .
+
+  ceq abst(M, T, N) = {NV, NV = T, 1}
+  if not T :: Variable
+  /\ not T :: Constant
+  /\ TY := leastSort(M,T)
+  /\ TY in ('Boolean ; 'Integer ; 'Real)
+  /\ NV := auxVarGen(N, TY) . 
 
   ceq abst(M, F[TL], N) = {F[TL'], CD, N'}
   if TY := leastSort(M,F[TL])
@@ -142,6 +143,7 @@ fmod ABST-BUILTIN is
   /\ { TL', CD', N'' } := abst(M, NTL, N + N') .
 
   eq abst(M, empty, N) = {empty, nil, 0} .
+  eq abst(M, T, N) = {T, nil, 0} [owise] .
 
 
 *** aux functions
@@ -215,19 +217,18 @@ fmod TRANSFORMATION is
   op trRule : Module Rule Nat -> TranslateResult . 
   ceq trRule (M, crl T => T' if COND [ATTR]., N) =
   	{ normRule(rl '`[_`][L'] => 
-    '`[_|_`]['`[_`][R'],'_and_['_and_[toTermList(CD), toTermList(COND)], toTermList(CD')]] [nonexec ATTR].), N'' }
-  if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N').
+    '`[_|_`]['`[_`][R'],'_and_['_and_[toTermList(CD), toTermList(COND)], toTermList(CD')]] [nonexec ATTR].), N' + N'' }
+  if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N + N').
 
 
   ceq trRule (M, rl T => T' [ATTR]., N) =
     { normRule(rl '`[_`][L'] => 
-    '`[_|_`]['`[_`][R'], '_and_[toTermList(CD), toTermList(CD')]] [nonexec ATTR].), N''} 
-    if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N') .
+    '`[_|_`]['`[_`][R'], '_and_[toTermList(CD), toTermList(CD')]] [nonexec ATTR].), N' + N''} 
+    if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N + N') .
 
   op tr : Module RuleSet Nat -> RuleSet .
   eq tr (M, none, N) = none .
-  ceq tr (M, RU RS, N) = RU' tr(M, RS, N + N') 
-  if { RU' , N' } := trRule(M, RU, N) .
+  ceq tr (M, RU RS, N) = RU' tr(M, RS, N + N') if { RU', N' } := trRule(M, RU, N) .
 
 --- TODO: need to add fmod, smod
 

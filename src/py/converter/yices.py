@@ -1,3 +1,5 @@
+import ctypes
+
 from ..interface import *
 from ..util import *
 from functools import reduce
@@ -81,6 +83,7 @@ class YicesConverter(Converter):
 
         self._func_dict = dict()
         self._module = None
+        self._dag2term_memoize = dict()
 
     def prepareFor(self, module: Module):
         # clear previous
@@ -92,6 +95,7 @@ class YicesConverter(Converter):
         self._special_id.clear()
         self._var_dict.clear()
         self._fun_dict.clear()
+        self._dag2term_memoize.clear()
         self._module = None
 
         # recreate the id generator
@@ -183,7 +187,8 @@ class YicesConverter(Converter):
         return self._func_dict[key]
     
     def term2dag(self, term):
-        return self._module.parseTerm(self._term2dag(term))
+        t, _, _ = term
+        return self._module.parseTerm(self._term2dag(t))
 
     def _term2dag(self, term):
         t, ty = term
@@ -215,6 +220,195 @@ class YicesConverter(Converter):
         if constructor == YICES_BOOL_CONSTANT:
             return f"({Terms.to_string(t)}).Boolean"
         
+
+        bool_type = Types.bool_type()
+        real_type = Types.real_type()
+        int_type = Types.int_type()
+
+        if constructor == YICES_NOT_TERM:
+            c = yices_term_child(t, 0)
+            child = self._term2dag((c, bool_type)) 
+            return f"not {child}"
+
+        if constructor == YICES_OR_TERM: 
+            ts = [yices_term_child(t, 0), yices_term_child(t, 1)]
+
+            l = self._term2dag((ts[0], bool_type))
+            r = self._term2dag((ts[1], bool_type))
+            return f"{l} or {r}"
+
+        # case YICES_XOR_TERM: {
+        #     Vector < DagNode * > arg(2);
+
+        #     yices_term child1{};
+        #     yices_term child2{};
+
+        #     child1.term = yices_term_child(e.term, 0);
+        #     child1.type = yices_bool_type();
+
+        #     child2.term = yices_term_child(e.term, 1);
+        #     child2.type = yices_bool_type();
+
+        #     arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+        #     arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+        #     return extensionSymbol->xorBoolSymbol->makeDagNode(arg);
+        # }
+        if constructor == YICES_EQ_TERM:
+            ts = [yices_term_child(t, 0), yices_term_child(t, 1)]
+
+            # l = self._term2dag((ts[0], bool_type))
+            # r = self._term2dag((ts[1], bool_type))
+
+            # real type
+            if Terms.type_of_term(ts[0]) == real_type or Terms.type_of_term(ts[1]) == real_type:
+                l = self._term2dag((ts[0], real_type))
+                r = self._term2dag((ts[1], real_type))
+                return f"{l} === {r}"
+            elif Terms.type_of_term(ts[0]) == int_type and Terms.type_of_term(ts[1]) == int_type:
+                l = self._term2dag((ts[0], int_type))
+                r = self._term2dag((ts[1], int_type))
+                return f"{l} === {r}"
+            else:
+                l = self._term2dag((ts[0], bool_type))
+                r = self._term2dag((ts[1], bool_type))
+                return f"{l} === {r}"
+
+        # case YICES_ITE_TERM: {
+        #     Vector < DagNode * > arg(3);
+        #     yices_term child1{};
+        #     yices_term child2{};
+        #     yices_term child3{};
+
+        #     child1.term = yices_term_child(e.term, 0);
+        #     child2.term = yices_term_child(e.term, 1);
+        #     child3.term = yices_term_child(e.term, 2);
+
+        #     child1.type = yices_bool_type();
+
+        #     if (yices_type_of_term(child2.term) == yices_int_type()){
+        #         child2.type = yices_int_type();
+        #         child3.type = yices_int_type();
+
+        #         arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+        #         arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+        #         arg[2] = Term2Dag(child3, extensionSymbol, rsv);
+
+        #         return extensionSymbol->iteIntSymbol->makeDagNode(arg);
+        #     } else if (yices_type_of_term(child2.term) == yices_real_type()){
+        #         child2.type = yices_real_type();
+        #         child3.type = yices_real_type();
+
+        #         arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+        #         arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+        #         arg[2] = Term2Dag(child3, extensionSymbol, rsv);
+
+        #         return extensionSymbol->iteRealSymbol->makeDagNode(arg);
+        #     } else {
+        #         child2.type = yices_bool_type();
+        #         child3.type = yices_bool_type();
+
+        #         arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+        #         arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+        #         arg[2] = Term2Dag(child3, extensionSymbol, rsv);
+
+        #         return extensionSymbol->iteBoolSymbol->makeDagNode(arg);
+        #     }
+        # }
+        if constructor == YICES_ARITH_GE_ATOM:
+            ts = [yices_term_child(t, 0), yices_term_child(t, 1)]
+            if Terms.type_of_term(ts[0]) == real_type or Terms.type_of_term(ts[1]) == real_type:
+                l = self._term2dag((ts[0], real_type))
+                r = self._term2dag((ts[1], real_type))
+                return f"{l} >= {r}"
+            else:
+                l = self._term2dag((ts[0], int_type))
+                r = self._term2dag((ts[1], int_type))
+                return f"{l} >= {r}"
+        
+
+        # case YICES_IS_INT_ATOM: {
+        #     Vector < DagNode * > arg(1);
+
+        #     yices_term child{};
+        #     child.term = yices_term_child(e.term, 0);
+        #     child.type = yices_real_type();
+
+        #     arg[0] = Term2Dag(child, extensionSymbol, rsv);
+        #     return extensionSymbol->isIntegerSymbol->makeDagNode(arg);
+        # }
+        if constructor == YICES_IDIV:
+            ts = [yices_term_child(t, 0), yices_term_child(t, 1)]
+ 
+            l = self._term2dag((ts[0], int_type))
+            r = self._term2dag((ts[1], int_type))
+            return f"{l} div {r}"
+
+        if constructor == YICES_RDIV:
+            ts = [yices_term_child(t, 0), yices_term_child(t, 1)]
+ 
+            l = self._term2dag((ts[0], int_type))
+            r = self._term2dag((ts[1], int_type))
+            return f"{l} / {r}"
+
+        # case YICES_IMOD: {
+        #     Vector < DagNode * > arg(2);
+
+        #     yices_term child1{};
+        #     yices_term child2{};
+
+        #     child1.term = yices_term_child(e.term, 0);
+        #     child2.term = yices_term_child(e.term, 1);
+        #     child1.type = yices_int_type();
+        #     child2.type = yices_int_type();
+
+        #     arg[0] = Term2Dag(child1, extensionSymbol, rsv);
+        #     arg[1] = Term2Dag(child2, extensionSymbol, rsv);
+        #     return extensionSymbol->modIntSymbol->makeDagNode(arg);
+        # }
+        # case YICES_FLOOR: {
+        #     Vector < DagNode * > arg(1);
+
+        #     yices_term child{};
+        #     child.term = yices_term_child(e.term, 0);
+        #     child.type = yices_real_type();
+
+        #     arg[0] = Term2Dag(child, extensionSymbol, rsv);
+        #     return extensionSymbol->toIntegerSymbol->makeDagNode(arg);
+	    # }
+        if constructor == YICES_POWER_PRODUCT:
+            child_num = yices_term_num_children(t)
+            args = list()
+            
+            for i in range(child_num):
+                c_t = ctypes.c_int32()
+                exp = ctypes.c_int32()
+                yices_product_component(t, i, c_t, exp)
+                args.append(self._term2dag((c_t, Terms.type_of_term(t))))
+
+            return " * ".join(args)
+
+
+        if constructor == YICES_ARITH_SUM:
+            child_num = yices_term_num_children(t)
+            args = list()
+
+            for i in range(child_num):
+                coeff = mpq_t()
+                c_t = ctypes.c_int32()
+                yices_sum_component(t, i, coeff, c_t)
+
+                coeff_t = yices_mpq(coeff);
+
+                if Terms.to_string(c_t) is None:
+                    args.append(self._term2dag((coeff_t, Terms.type_of_term(t))))
+                else:
+                    coc = self._term2dag((coeff_t, Terms.type_of_term(t)))
+                    c = self._term2dag((c_t, Terms.type_of_term(t)))
+
+                    args.append(f"{coc} * {c}")
+
+            return " + ".join(args)
+        
         raise Exception("failed to apply term2dag")
 
     def dag2term(self, t: Term):
@@ -225,9 +419,11 @@ class YicesConverter(Converter):
           an SMT solver term and its variables
         """
         term, v_set = self._dag2term(t)
-        return tuple([term, None, list(v_set)])
+        return tuple([(term, Terms.type_of_term(term)), None, list(v_set)])
     
     def _dag2term(self, t: Term):
+        if t in self._dag2term_memoize:
+            return self._dag2term_memoize[t]
 
         if t.isVariable():
             v_sort, v_name = str(t.getSort()), t.getVarName()
@@ -236,7 +432,10 @@ class YicesConverter(Converter):
 
             if key in self._var_dict:
                 v = self._var_dict[key]
-                return tuple([v, set([v])])
+                term = tuple([v, set([v])])
+
+                self._dag2term_memoize[t] = term
+                return term
 
             v = None
             if v_sort in self._sort_dict:
@@ -260,7 +459,10 @@ class YicesConverter(Converter):
             
             if v is not None:
                 self._var_dict[key] = v
-                return tuple([v, set([v])])
+                term = tuple([v, set([v])])
+
+                self._dag2term_memoize[t] = term
+                return term
 
             raise Exception("wrong variable {} with sort {}".format(v_name, v_sort))
 
@@ -307,11 +509,15 @@ class YicesConverter(Converter):
 
                     f = Terms.application(f, raw_args)
             
-            return tuple([f, v_s])
+            term = tuple([f, v_s])
+            self._dag2term_memoize[t] = term
+            return term
 
         if symbol in self._bool_const:
             c = self._bool_const[symbol]()
-            return tuple([c, set()])
+            term = tuple([c, set()])
+            self._dag2term_memoize[t] = term
+            return term
         
         if symbol in self._num_const:
             val = str(t)
@@ -323,7 +529,9 @@ class YicesConverter(Converter):
             val = val.replace("(", "").replace(")", "")
             c = self._num_const[symbol](val)
 
-            return tuple([c, set()])
+            term = tuple([c, set()])
+            self._dag2term_memoize[t] = term
+            return term
 
         if symbol in self._op_dict:
             p_args = [self._dag2term(arg) for arg in t.arguments()]
@@ -335,6 +543,8 @@ class YicesConverter(Converter):
             else:
                 t = op(*map(lambda x: x[0], p_args))
 
-            return tuple([t, reduce(lambda acc, cur: acc.union(cur[1]), p_args, set())])
+            term = tuple([t, reduce(lambda acc, cur: acc.union(cur[1]), p_args, set())])
+            self._dag2term_memoize[t] = term
+            return term
         
         raise Exception(f"fail to apply dag2term to \"{t}\"")

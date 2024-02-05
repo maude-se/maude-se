@@ -29,7 +29,7 @@ class YicesConnector(Connector):
     def check_sat(self, *consts):
         self._ctx.push()
 
-        self._ctx.assert_formulas([c for c, _, _ in consts])
+        self._ctx.assert_formulas([c for (c, _), _, _ in consts])
         r = self._ctx.check_context()
 
         if r == Status.SAT:
@@ -47,14 +47,14 @@ class YicesConnector(Connector):
     def add_const(self, acc, cur):
         # initial case
         if acc is None:
-            (cur_t, _, cur_v) = cur
+            ((cur_t, _), _, cur_v) = cur
             body = cur_t
 
         else:
-            (acc_f, _, acc_v), (cur_t, _, cur_v) = acc, cur
+            ((acc_f, _), _, acc_v), ((cur_t, _), _, cur_v) = acc, cur
             body = Terms.yand([acc_f, cur_t])
 
-        return tuple([body, None, None])
+        return tuple([(body, Terms.type_of_term(body)), None, None])
 
     def subsume(self, subst, prev, acc, cur):
         s = time.time()
@@ -62,8 +62,8 @@ class YicesConnector(Connector):
         d_s = time.time()
         t_v, t_l = list(), list()
         for p in subst:
-            src, _, _ = self._c.dag2term(p)
-            trg, _, _ = self._c.dag2term(subst[p])
+            (src, _), _, _ = self._c.dag2term(p)
+            (trg, _), _, _ = self._c.dag2term(subst[p])
 
             t_v.append(src)
             t_l.append(trg)
@@ -72,10 +72,10 @@ class YicesConnector(Connector):
 
         self._dt += d_e - d_s
 
-        prev_c, _, _ = prev
+        (prev_c, _), _, _ = prev
 
-        acc_c, _, _ = acc
-        cur_c, _, _ = cur 
+        (acc_c, _), _, _ = acc
+        (cur_c, _), _, _ = cur 
     
         so_s = time.time()
         self._ctx.push()
@@ -144,7 +144,7 @@ class YicesConnector(Connector):
         for t in self._m.collect_defined_terms():
             try:
                 ty = Terms.type_of_term(t)
-                model_dict[(t, ty)] = (Terms.parse_term(str(self._m.get_value(t)).lower()), ty)
+                model_dict[((t, ty), None, None)] = ((Terms.parse_term(str(self._m.get_value(t)).lower()), ty), None, None)
             except:
                 continue
         return model_dict

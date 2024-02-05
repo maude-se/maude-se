@@ -15,6 +15,7 @@
 #include "SMT_EngineWrapper.hh"
 
 #include "Python.h"
+#include <ctime>
 
 class SmtStateTransitionGraph
 {
@@ -33,6 +34,7 @@ public:
   int getNrStates() const;
   int getNextState(int stateNr, int index);
   DagNode *getStateDag(int stateNr);
+  PyObject* getStateConst(int stateNr);
   int getStateDepth(int stateNr) const;
   const ArcMap &getStateFwdArcs(int stateNr) const;
   //
@@ -165,6 +167,10 @@ protected:
   SortMap sortMap;
   FuncMap funcMap;
 
+  double nextTime;
+  double rewriteTime;
+  double elseTime;
+
 protected:
   PyObject *convDag2Term(DagNode *dag);
 };
@@ -180,7 +186,7 @@ inline SmtStateTransitionGraph::State::State(int hashConsIndex, int parent)
 inline int
 SmtStateTransitionGraph::getNrStates() const
 {
-  return seen.length();
+  return seen.size();
 }
 
 inline DagNode *
@@ -200,6 +206,25 @@ SmtStateTransitionGraph::getStateDag(int stateNr)
   }
   ConstrainedTerm *ct = consTermSeen[state->hashConsIndex][state->constTermIndex];
   return ct->dag;
+}
+
+inline PyObject *
+SmtStateTransitionGraph::getStateConst(int stateNr)
+{
+  // TODO: return const DAG
+  if (seen.size() <= stateNr)
+  {
+    IssueWarning("not found in seen states");
+  }
+
+  State *state = seen[stateNr];
+
+  if (consTermSeen[state->hashConsIndex].size() <= state->constTermIndex)
+  {
+    IssueWarning("consTermseen length wrong");
+  }
+  ConstrainedTerm *ct = consTermSeen[state->hashConsIndex][state->constTermIndex];
+  return ct->constraint;
 }
 
 inline int SmtStateTransitionGraph::getStateDepth(int stateNr) const
@@ -258,7 +283,10 @@ inline PyObject *SmtStateTransitionGraph::convDag2Term(DagNode *dag)
 {
   // call Python the dag2Term method of the Converter class
   PyObject *maudeTerm = dag2maudeTerm(dag);
+  clock_t loop_s = clock();
   PyObject *term = PyObject_CallMethodObjArgs(termConverter, dag2term, maudeTerm, NULL);
+  clock_t loop_e = clock();
+  elseTime += (double)(loop_e - loop_s);
   if (term == nullptr)
   {
     IssueWarning("failed to call Converter's dag2term for " << dag);
