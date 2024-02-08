@@ -33,6 +33,7 @@ fmod MAUDE-SE-SYNTAX is
   op fsmt-search`[_`,_`]in_:_=>_such`that_using_. : Bubble Bubble NaBubble Bubble Bubble Bubble Bubble -> Command .
   op check`in_:_using_. : NaBubble Bubble Bubble -> Command .
   op show`assn`. : -> Command .
+  op show`path`. : -> Command .
 endfm
 
 fmod MAUDE-SE-PRELUDE is
@@ -86,6 +87,7 @@ omod MAUDE-SE-META-INTERPRETER is
   var V : Variable .
   var CO : Constant .
   var MO : Module .
+  var ST : Trace2 .
 
   op o : -> Oid .
 
@@ -223,7 +225,7 @@ omod MAUDE-SE-META-INTERPRETER is
 
   rl < O : MaudeSE | state : 24, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
   => < O : MaudeSE | state : 2 > getLine(stdin, O, smtResult2str(upModule(MN, false), downTerm(T, (failure).SmtResult2?)) + "MaudeSE> ") .
-  
+
   op getNum : Qid -> Nat .
   eq getNum(QI) = downTerm(qid("s_^" + string(downTerm(QI, QI)))['0.Zero], (0).Nat) .
 
@@ -245,6 +247,23 @@ omod MAUDE-SE-META-INTERPRETER is
   eq getVars(QI[TL]) = getVars(TL) .
   eq getVars((T, NTL)) = getVars(T) ; getVars(NTL) .
   eq getVars(empty) = none .
+
+---------------------------------------
+--- SMT search path command
+---------------------------------------
+
+  rl < O : MaudeSE | state : 6, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), logic : LO, search-fold : B > processInput(O, 'show`path`..Command)
+  => < O : MaudeSE | state : 30 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearchPath(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, getNum(NT), LO, B))) .
+
+  rl < O : MaudeSE | state : 30, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, trace2str(upModule(MN, false), downTerm(T, (failure).Trace2?)) + "MaudeSE> ") .
+
+  op trace2str : Module Trace2? -> String .
+  eq trace2str(MO, failure) = "Failed to get path.\n\n" .
+  eq trace2str(MO, (T || T') ST) = printTokens(
+    '`{ metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '`, '\n 
+       metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '`} '\n) + trace2str(MO, ST) .
+  eq trace2str(MO, nil) = "" .
 
 endom
 
