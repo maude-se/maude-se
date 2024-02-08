@@ -264,6 +264,8 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 			// we have pair of terms (norm, prev)
 			PyObject *cur = convDag2Term(c2);
 
+			Py_XINCREF(acc);
+
 			PyObject *result = PyObject_CallMethodObjArgs(connector, check_sat, acc, cur, NULL);
 			if (result == nullptr)
 			{
@@ -302,6 +304,8 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 						IssueWarning("failed to make a constraint");
 					}
 
+					Py_XINCREF(next);
+
 					PyObject *objectsRepresentation00 = PyObject_Repr(next);
 					const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
 
@@ -310,6 +314,10 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 
 					PyObject *objectsRepresentation22 = PyObject_Repr(cur);
 					const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
+
+					Py_XDECREF(objectsRepresentation00);
+					Py_XDECREF(objectsRepresentation11);
+					Py_XDECREF(objectsRepresentation22);
 
 					const void *address = static_cast<const void *>(newState->dag);
 					std::stringstream strs;
@@ -413,7 +421,33 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 							IssueWarning("failed to make a constraint");
 						}
 
+						Py_XINCREF(next);
+
+						PyObject *objectsRepresentation00 = PyObject_Repr(next);
+						const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
+
+						PyObject *objectsRepresentation11 = PyObject_Repr(acc);
+						const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
+
+						PyObject *objectsRepresentation22 = PyObject_Repr(cur);
+						const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
+
+						Py_XDECREF(objectsRepresentation00);
+						Py_XDECREF(objectsRepresentation11);
+						Py_XDECREF(objectsRepresentation22);
+
+						Verbose("  new State " << counter << " added");
+						Verbose("  dag : ");
+						Verbose("  " << newState->dag);
+						Verbose("  acc : ");
+						Verbose("  " << ss11);
+						Verbose("  cur : ");
+						Verbose("  " << ss22);
+						Verbose("  and : ");
+						Verbose("  " << ss00);
+
 						ConstrainedTerm *t = new ConstrainedTerm(c1, next);
+						t->dag->mark();
 
 						consTermSeen[index2].append(t);
 						map2seen.insert(Map2Seen::value_type(make_tuple(index2, newState->constTermIndex), seen.size()));
@@ -590,6 +624,8 @@ void SmtStateTransitionGraph::printStateConst(int depth)
 			{
 				PyObject *str = PyObject_Repr(it->constraint);
 				const char *str_c = PyUnicode_AsUTF8(str);
+				Py_XDECREF(str);
+
 				cout << "      dag   [" << cc + 1 << "]" << it->dag << endl;
 				cout << "      const [" << cc + 1 << "]" << str_c << endl;
 				cout << endl;

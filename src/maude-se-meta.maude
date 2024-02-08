@@ -1,0 +1,251 @@
+load file
+load metaInterpreter
+
+fmod MAUDE-SE-SYNTAX is
+  pr QID-LIST .
+  sorts Token Bubble NaBubble NeTokenList .
+
+  op token : Qid -> Token 
+  [special(
+    id-hook Bubble (1 1)
+    op-hook qidSymbol (<Qids> : ~> Qid))] .
+
+  op bubble : QidList -> Bubble
+  [special(
+    id-hook Bubble (1 -1)
+    op-hook qidListSymbol (__ : QidList QidList ~> QidList)
+    op-hook qidSymbol (<Qids> : ~> Qid)
+    id-hook Exclude (.))] .
+
+  op naBubble : QidList -> NaBubble
+  [special(
+    id-hook Bubble (1 -1)
+    op-hook qidListSymbol (__ : QidList QidList ~> QidList)
+    op-hook qidSymbol (<Qids> : ~> Qid)
+    id-hook Exclude (. :))] .
+
+  sorts Optional OptionalList Input Command .
+  subsort Optional < OptionalList .
+  subsorts Command < Input .
+
+  op select_. : Bubble -> Command .
+  op smt-search`[_`,_`]in_:_=>_such`that_using_. : Bubble Bubble NaBubble Bubble Bubble Bubble Bubble -> Command .
+  op fsmt-search`[_`,_`]in_:_=>_such`that_using_. : Bubble Bubble NaBubble Bubble Bubble Bubble Bubble -> Command .
+  op check`in_:_using_. : NaBubble Bubble Bubble -> Command .
+  op show`assn`. : -> Command .
+endfm
+
+fmod MAUDE-SE-PRELUDE is
+  pr MAUDE-SE-SYNTAX .
+  pr META-SMT-CHECK .
+  pr META-SMT-SEARCH2 .
+endfm
+
+fmod MAYBE{X :: TRIV} is 
+  sort Maybe{X} .
+  subsort X$Elt < Maybe{X} .
+  op null : -> Maybe{X} .
+endfm
+
+view Oid from TRIV to CONFIGURATION is
+  sort Elt to Oid .
+endv
+
+view Module from TRIV to META-MODULE is
+  sort Elt to Module .
+endv
+
+omod MAUDE-SE-META-INTERPRETER is
+  pr META-SMT-CHECK .
+  pr META-SMT-SEARCH2 .
+  inc STD-STREAM .
+  inc LEXICAL .
+  inc MAYBE{Oid} * (op maybe to null) .
+  inc MAYBE{Qid} * (op maybe to null) .
+  inc MAYBE{Module} * (op maybe to null) .
+  inc META-INTERPRETER .
+
+  class MaudeSE | mi : Maybe{Oid}, mn : Maybe{Qid}, logic : Maybe{Qid}, 
+                  in : QidList, state : Nat, check-result : SmtCheckResult,
+                  search-info : TermList, search-fold : Bool .
+
+  vars C N : Nat .
+  vars O O' Y MI : Oid .
+  vars MN LO QI : Qid .
+  var STR : String .
+  var QIL : QidList .
+  vars PT T T' T'' : Term .
+  vars NT MT TH MM : Term .
+  var TL : TermList .
+  vars TY TY' : Type .
+  var RES : SmtCheckResult .
+  var ASSNS : SatAssignmentSet .
+  var SUBS : Substitution .
+  var B : Bool .
+  var NTL : NeTermList .
+  var V : Variable .
+  var CO : Constant .
+  var MO : Module .
+
+  op o : -> Oid .
+
+  msg processInput : Oid Term -> Msg .
+
+  op maudeSE : -> Configuration .
+  eq maudeSE = <>
+    < o : MaudeSE | mi : null, mn : null, logic : null, in : nil, state : 0, check-result : unknown, search-info : empty, search-fold : false >
+    write(stdout, o, "\n\t MaudeSE Execution Environment\n\n")
+    createInterpreter(interpreterManager, o, none) .
+
+---------------------------------------
+--- Base loading and loop
+---------------------------------------
+
+  rl < O : MaudeSE | state : 0, mi : null > wrote(O, O') createdInterpreter(O, Y, MI)
+  => < O : MaudeSE | state : 1, mi : MI > insertModule(MI, O, upModule('MAUDE-SE-PRELUDE, true)) .
+
+  rl < O : MaudeSE | state : 1 > insertedModule(O, O')
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, "MaudeSE> ") .
+
+  rl < O : MaudeSE | state : 1, mi : MI > interpreterError(O, MI, STR)
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, "Module import failed : " + STR + "\n\nMaudeSE> ") .
+
+  rl < O : MaudeSE | state : 2, mi : MI, in : QIL > gotLine(O, O', STR)
+  => if tokenize(STR) == 'quit or tokenize(STR) == 'q then 
+        < O : MaudeSE | state : 3 > write(stdout, O, "goodbye.\n\n")
+        quit(MI, O)
+     else 
+        < O : MaudeSE | in : QIL tokenize(STR), state : 4 >
+        parseTerm(MI, O, 'MAUDE-SE-PRELUDE, none, QIL tokenize(STR), 'Input) fi .
+
+  rl < O : MaudeSE | mi : MI, state : 3 > wrote(O, O') bye(O, MI) => none .
+
+  rl < O : MaudeSE | mi : MI, in : QIL, state : 4 > parsedTerm(O, MI, {T, TY})
+  => < O : MaudeSE | mi : MI, in : nil, state : 6 > processInput(O, T) .
+
+  rl < O : MaudeSE | mi : MI, in : QIL, state : 4 > parsedTerm(O, MI, ambiguity({T, TY}, {T', TY'}))
+  => < O : MaudeSE | mi : MI, in : nil, state : 5 > write(stdout, O, "Ambiguous input\n\n") .
+
+  rl < O : MaudeSE | mi : MI, in : QIL, state : 4 > parsedTerm(O, MI, noParse(N))
+  => if N == size(QIL) then 
+        < O : MaudeSE | state : 2 > 
+        getLine(stdin, O, "> ")
+     else 
+        < O : MaudeSE | in : nil, state : 5 > 
+        write(stdout, O, "Parse error\n\n") fi .
+
+  rl < O : MaudeSE | state : 5, mi : MI > wrote(O, O') => < O : MaudeSE | state : 3 > wrote(O, O') quit(MI, O) .
+
+  rl < O : MaudeSE | state : 6, mn : null > processInput(O, 'check`in_:_using_.[TL])
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, "No module in the system.\n\nMaudeSE> ") .
+
+  rl < O : MaudeSE | state : 6, mi : MI > processInput(O, 'select_.['bubble[T]])
+  => < O : MaudeSE | state : 1, mi : MI, mn : downTerm(T, 'default-name) > 
+    insertModule(MI, O, upModule(downTerm(T, 'default-name), true)) .
+
+---------------------------------------
+--- Check command
+---------------------------------------
+
+  rl < O : MaudeSE | state : 6, mi : MI > processInput(O, 'check`in_:_using_.['naBubble[T], 'bubble[T'], 'bubble[T'']])
+  => < O : MaudeSE | state : 11, logic : downTerm(T'', 'default-name) > 
+    parseTerm(MI, O, downTerm(T, 'default-name), none, downTerm(T', 'default-name), anyType) .
+
+  rl < O : MaudeSE | state : 11, mi : MI, mn : MN, logic : LO > parsedTerm(O, MI, {T, TY})
+  => < O : MaudeSE | state : 12 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtCheck(upModule(MN, false), T, LO, true))) .
+
+  rl < O : MaudeSE | state : 12, mi : MI > reducedTerm(O, MI, C, T, TY)
+  => < O : MaudeSE | state : 2, check-result : downTerm(T, unknown) > 
+    getLine(stdin, O, result2str(downTerm(T, unknown)) + "MaudeSE> ") .
+
+  op result2str : SmtCheckResult -> String .
+  eq result2str(RES) = "result: " + $result2str(RES) + "\n\n" .
+
+  op $result2str : SmtCheckResult -> String .
+  eq $result2str(true) = "sat" .
+  eq $result2str(false) = "unsat" .
+  eq $result2str(unknown) = "unknown" .
+  eq $result2str({ASSNS}) = "sat" .
+
+---------------------------------------
+--- Show assignment command
+---------------------------------------
+
+  rl < O : MaudeSE | state : 6, check-result : RES > processInput(O, 'show`assn`..Command)
+  => < O : MaudeSE | state : 15 > write(stdout, O, assn2str(RES)) .
+
+  rl < O : MaudeSE | state : 15 > wrote(O, O')
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, "MaudeSE> ") .
+
+  op assn2str : SmtCheckResult -> String .
+  eq assn2str(unknown) = "No assignment.\n\n" .
+  eq assn2str(true) = "The check sat result was true, but cannot show an assignment.\n\n" .
+  eq assn2str(false) = "error occurs while generating assignment.\n\n" .
+  eq assn2str(RES) = printTokens('\n 'assignment: '\n $assn2str(RES) '\n) .
+
+  op $assn2str : SmtCheckResult -> QidList .
+  eq $assn2str({(T |-> T'), ASSNS}) = '\t T '|--> T' '\n $assn2str({ASSNS}) .
+  eq $assn2str({empty}) = nil .
+
+
+---------------------------------------
+--- SMT search command
+---------------------------------------
+
+  rl < O : MaudeSE | state : 6, mi : MI, in : QIL > processInput(O, 'smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]])
+  => < O : MaudeSE | state : 20, mn : downTerm(MM, 'default-name), in : QIL ('smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]]),
+                     search-fold : false > insertModule(MI, O, upModule(downTerm(MM, 'default-name), true)) .
+
+  rl < O : MaudeSE | state : 6, mi : MI, in : QIL > processInput(O, 'fsmt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]])
+  => < O : MaudeSE | state : 20, mn : downTerm(MM, 'default-name), in : QIL ('smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]]),
+                     search-fold : true > insertModule(MI, O, upModule(downTerm(MM, 'default-name), true)) .
+
+  rl < O : MaudeSE | state : 20, mi : MI, mn : MN, in : ('smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]]) QIL > insertedModule(O, MI)
+  => < O : MaudeSE | state : 21, logic : downTerm(TH, 'default-name), search-info : empty > parseTerm(MI, O, MN, none, downTerm(T, 'default-name), anyType) .
+
+
+  rl < O : MaudeSE | state : 21, mi : MI, mn : MN, search-info : TL,
+                     in : ('smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]]) QIL > parsedTerm(O, MI, {PT, TY})
+  => < O : MaudeSE | state : 22, search-info : (((TL, NT), MT), PT) > parseTerm(MI, O, MN, none, downTerm(T', 'default-name), anyType) .
+
+
+  rl < O : MaudeSE | state : 22, mi : MI, mn : MN, search-info : TL,
+                     in : ('smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]]) QIL > parsedTerm(O, MI, {PT, TY})
+  => < O : MaudeSE | state : 23, search-info : (TL, PT) > parseTerm(MI, O, MN, none, downTerm(T'', 'default-name), anyType) .
+
+
+  rl < O : MaudeSE | state : 23, mi : MI, mn : MN, search-info : (NT, MT, T, T'), logic : LO, search-fold : B,
+                     in : ('smt-search`[_`,_`]in_:_=>_such`that_using_.[TL]) QIL > parsedTerm(O, MI, {T'', TY})
+  => < O : MaudeSE | state : 24, in : QIL, search-info : (NT, MT, T, T', T'') > 
+  reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearch2(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, getNum(NT), LO, B))) .
+
+---  clear prev
+
+  rl < O : MaudeSE | state : 24, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, smtResult2str(upModule(MN, false), downTerm(T, (failure).SmtResult2?)) + "MaudeSE> ") .
+  
+  op getNum : Qid -> Nat .
+  eq getNum(QI) = downTerm(qid("s_^" + string(downTerm(QI, QI)))['0.Zero], (0).Nat) .
+
+  op smtResult2str : Module SmtResult2? -> String .
+  eq smtResult2str(MO, failure) = "Failed to perform rewriting modulo SMT.\n\n" .
+  eq smtResult2str(MO, {T, SUBS, T', T'', N}) = printTokens(
+    'Symbolic 'state: metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '\n
+    'Constraint: metaPrettyPrint(MO, getVars(T''), T'', mixfix with-parens) '\n 
+    'Substitution: printSubst(MO, SUBS) '\n
+    'Concrete 'state: metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '\n '\n) .
+
+  op printSubst : Module Substitution -> QidList .
+  eq printSubst(MO, none) = nil .
+  eq printSubst(MO, V <- T ; SUBS) = metaPrettyPrint(MO, V, V, mixfix with-parens) '<-- metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '\n printSubst(MO, SUBS) .
+
+  op getVars : TermList -> VariableSet .
+  eq getVars(V) = V .
+  eq getVars(CO) = none .
+  eq getVars(QI[TL]) = getVars(TL) .
+  eq getVars((T, NTL)) = getVars(T) ; getVars(NTL) .
+  eq getVars(empty) = none .
+
+endom
+
+erewrite maudeSE .

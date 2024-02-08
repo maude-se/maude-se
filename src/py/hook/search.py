@@ -105,8 +105,8 @@ class SearchHook(Hook):
         s_t, = sol.arguments()
 
         # print("where")
-        # print(self.conv.term2dag(const))
-        return self._get_symbol("success").makeTerm([symbol_mo.upTerm(s_t), subst_t, symbol_mo.upTerm(subst.instantiate(s_t)), symbol_mo.parseTerm(f"({num}).Nat")])
+        ct = self.conv.term2dag(const)
+        return self._get_symbol("success").makeTerm([symbol_mo.upTerm(s_t), subst_t, symbol_mo.upTerm(subst.instantiate(s_t)), symbol_mo.upTerm(ct), symbol_mo.parseTerm(f"({num}).Nat")])
 
       # if n >= max_num - 1:
       #   break

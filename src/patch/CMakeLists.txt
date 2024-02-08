@@ -225,7 +225,7 @@ if (${LANGUAGE} STREQUAL python)
 	INSTALL(FILES ${FILES_TO_DEPLOY} DESTINATION maudeSE)
 	INSTALL(DIRECTORY ${DIRS_TO_DEPLOY} DESTINATION maudeSE)
 	install(FILES
-		"../src/smt-check.maude" DESTINATION maudeSE/maude)
+		"../src/smt-check.maude" "../src/maude-se-meta.maude" DESTINATION maudeSE/maude)
 
 elseif (${LANGUAGE} STREQUAL java)
 	include(UseJava)

@@ -187,6 +187,56 @@ class Z3Converter(Converter):
         return self._module.parseTerm(self._term2dag(t))
 
     def _term2dag(self, term):
+
+        if z3.is_and(term):
+            return " and ".join([self._term2dag(c) for c in term.children()])
+        
+        if z3.is_or(term):
+            return " or ".join([self._term2dag(c) for c in term.children()])
+
+        if z3.is_not(term):
+            return f"(not {self._term2dag(term.arg(0))})"
+
+        if z3.is_eq(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} === {r}"
+
+        if z3.is_gt(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} > {r}"
+
+        if z3.is_ge(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} >= {r}"
+
+        if z3.is_lt(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} < {r}"
+
+        if z3.is_le(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} <= {r}"
+        
+        if z3.is_add(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} + {r}"
+
+        if z3.is_sub(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} - {r}"
+
+        if z3.is_mul(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+            return f"{l} * {r}"
+
+        if z3.is_div(term):
+            l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
+
+            if term.is_int():
+                return f"{l} div {r}"
+            else:
+                return f"{l} / {r}"
+        
         # variable or function
         if isinstance(term, z3.z3.FuncDeclRef):
             if term.arity() > 0:
@@ -203,7 +253,7 @@ class Z3Converter(Converter):
                 assert sort_s in sort_table
 
                 return f"{term.name()}:{sort_table[sort_s]}"
-        
+
         # rational
         if isinstance(term, z3.RatNumRef):
             return f"({term.numerator()}/{term.denominator()}).Real"
@@ -222,44 +272,14 @@ class Z3Converter(Converter):
         if isinstance(term, z3.z3.BoolRef):
             return f"({str(term).lower()}).Boolean"
         
+        # In this case, the term must be a variable
+        if isinstance(term, z3.z3.ArithRef):
+            if term.is_int():
+                return f"{term}:Integer"
+            else:
+                return f"{term}:Real"
+        
         raise Exception("failed to apply term2dag")
-        # # hack
-        # t_hash = hash(term)
-        # if t_hash in self._var_map:
-        #     return str(self._var_map[t_hash])
-        
-        # if z3.is_int_value(term):
-        #     return f"({term}).Integer"
-        
-        # if z3.is_rational_value(term):
-        #     # hack
-        #     if "/" not in str(term):
-        #         return f"({term}/1).Real"
-        #     return f"({term}).Real"
-        
-        # # TODO:...
-        # # if z3.is_and(term):
-        #     # print([self._term2dag(arg) for arg in term.args])
-
-        # if z3.is_gt(term):
-        #     l, r = self._term2dag(term.arg(0)), self._term2dag(term.arg(1))
-        #     return f"{l} > {r}"
-
-        # str_t, sort = str(term), str(term.sort())
-
-        # print(term, type(term))
-        # for name in self._var_map:
-        #     str_t = str_t.replace(name, self._tr_map[name])
-
-        # if z3.is_const(term):
-        #     if str_t not in self._var_map:
-        #         s = f"{str_t}.{self._z3_sort_map[sort]}"
-        #     else:
-        #         s = f"{str_t}:{self._z3_sort_map[sort]}"
-            
-        #     return self._module.parseTerm(s)
-        
-        # return self._module.parseTerm(str_t)
 
     def dag2term(self, t: Term):
         """translate a maude term to a SMT solver term

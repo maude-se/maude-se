@@ -214,7 +214,7 @@ bool RewriteSmtSearchState::initSubstitution(const VariableInfo &varInfo)
         ++newVariableNumber;
         Symbol *baseSymbol = varInfo.index2Variable(k)->symbol();
 
-        string newNameString = "#ubVar$";
+        string newNameString = "%%ubVar$";
         char *name = mpz_get_str(0, 10, newVariableNumber.get_mpz_t());
         newNameString += name;
         free(name);

@@ -56,6 +56,8 @@ RewriteSmtSequenceSearch::RewriteSmtSequenceSearch(RewritingContext *initial,
   {
     IssueWarning("failed to make a constraint22");
   }
+
+  Py_XINCREF(next);
   ConstrainedTerm *t = new ConstrainedTerm(initial->root(), next);
 
   consTermSeen.insert(ConstrainedTermMap::value_type(initState->hashConsIndex, Vector<ConstrainedTerm *>()));
@@ -334,6 +336,8 @@ bool RewriteSmtSequenceSearch::checkMatchConstraint(int stateNr)
     ConstrainedTerm *constrained = consTermSeen[seen[stateNr]->hashConsIndex][seen[stateNr]->constTermIndex];
     PyObject *pyConst = constrained->constraint;
 
+    Py_XINCREF(pyConst);
+
     PyObject *check_sat_r = PyObject_CallMethodObjArgs(connector, check_sat, pyConst, matchTerm, NULL);
     if (check_sat_r != nullptr)
     {
@@ -344,6 +348,7 @@ bool RewriteSmtSequenceSearch::checkMatchConstraint(int stateNr)
       else 
       {
           constrained->constraint = PyObject_CallMethodObjArgs(connector, add_const, constrained->constraint, matchTerm, NULL);
+          Py_XINCREF(constrained->constraint);
       }
     }
     else

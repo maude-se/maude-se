@@ -49,7 +49,6 @@ patch_src() {
   patch "$maude_src_dir/subprojects/maudesmc/src/Mixfix/search.cc" < "$patch_src_dir/maude/mixfix-search-cc.patch"
   patch "$maude_src_dir/subprojects/maudesmc/src/Mixfix/top.yy" < "$patch_src_dir/maude/mixfix-top-yy.patch"
   patch "$maude_src_dir/subprojects/maudesmc/src/SMT/SMT.hh" < "$patch_src_dir/maude/smt-SMT-hh.patch"
-  patch "$maude_src_dir/swig/specific/python.i" < "$patch_src_dir/swig/specific-python-i.patch"
   patch "$maude_src_dir/swig/maude.i" < "$patch_src_dir/swig/maude-i.patch"
   patch "$maude_src_dir/swig/term.i" < "$patch_src_dir/swig/term-i.patch"
   patch "$maude_src_dir/src/easyTerm.cc" < "$patch_src_dir/bindings/easyTerm-cc.patch"
@@ -85,6 +84,7 @@ build_src() {
   cp "$src_dir/maude/smtStateTransitionGraph.hh" "$maude_src_dir/SMT"
   cp "$src_dir/maude/rewriteSmtSearch.cc" "$maude_src_dir/Mixfix"
   cp "$src_dir/swig/rwsmt.i" "$swig_src_dir"
+  cp "$src_dir/swig/python.i" "$swig_src_dir/specific"
 
   cd maude-bindings 
   (

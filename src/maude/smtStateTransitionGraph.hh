@@ -293,6 +293,7 @@ inline PyObject *SmtStateTransitionGraph::convDag2Term(DagNode *dag)
   }
   // remove a maude object
   // Py_DECREF(maudeTerm);
+  Py_XINCREF(term);
   return term;
 }
 
