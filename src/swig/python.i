@@ -162,11 +162,34 @@ __version__ = '1.2.3'
 	def __iter__(self):
 		return self
 
+	def pathTo(self, stateNr):
+		r"""
+		Get the path from the initial to the given state.
+
+		:type stateNr: int
+		:param stateNr: State index.
+
+		:rtype: list of :py:class:`Term` and :py:class:`Rule`
+		:return: A list interleaving terms and rules that connect
+		  them from the initial to the given state.
+		"""
+		parent = self.getStateParent(stateNr)
+
+		if parent < 0:
+			path = [(self.getStateTerm(stateNr), self.getStateConst(stateNr))]
+		else:
+			path = self.pathTo(parent)
+			path.append((self.getStateTerm(stateNr), self.getStateConst(stateNr)))
+
+		return path
+
 	def __next__(self):
 		term = self.__next()
 		if term is None:
 			raise StopIteration
-		return term, self.getStateConst(self.getStateNr()), self.getRewriteCount(), self.getStateNr()
+		
+		stateNr = self.getStateNr()
+		return term, self.getStateConst(stateNr), self.getRewriteCount(), stateNr, lambda: self.pathTo(stateNr)
 %}
 }
 

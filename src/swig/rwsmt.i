@@ -95,5 +95,14 @@ public:
 	 */
 	int getStateParent(int stateNr) const;
 
+	/**
+	 * Get the constraint of a constrained term.
+	 *
+	 * @param stateNr The number of a state in the search graph.
+	 *
+	 * @return An SMT constraint
+	 */
+	PyObject* getStateConst(int stateNr);
+
 	%unprotectDestructor(RewriteSmtSequenceSearch);
 };

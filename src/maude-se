@@ -33,8 +33,11 @@ if __name__ == '__main__':
         hook = CheckHook(conn, conv)
         maudeSE.maude.connectEqHook('SmtCheckerSymbol', hook)
 
-        searchHook = SearchHook(conn, conv)
+        searchHook = SearchHook(conn, conv, path=False)
         maudeSE.maude.connectEqHook('SmtSearchSymbol', searchHook)
+
+        searchPathHook = SearchHook(conn, conv, path=True)
+        maudeSE.maude.connectEqHook('SmtSearchPathSymbol', searchPathHook)
 
         # load preludes
 
