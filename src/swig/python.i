@@ -179,6 +179,8 @@ __version__ = '1.2.3'
 			path = [(self.getStateTerm(stateNr), self.getStateConst(stateNr))]
 		else:
 			path = self.pathTo(parent)
+
+			path.append(self.getRule(stateNr))
 			path.append((self.getStateTerm(stateNr), self.getStateConst(stateNr)))
 
 		return path

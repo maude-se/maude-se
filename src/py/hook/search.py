@@ -13,11 +13,13 @@ class SearchHook(Hook):
 
         # special symbol dict
         self._symbol_dict = {
-            "fail"      : "failureSymbol",
-            "success"   : "resultSymbol",
-            "traceStep" : "traceStepSymbol",
-            "nilTrace"  : "nilTraceSymbol",
-            "trace"     : "traceSymbol"
+            "fail"          : "failureSymbol",
+            "success"       : "resultSymbol",
+            "traceStep"     : "traceStepSymbol",
+            "nilTrace"      : "nilTraceSymbol",
+            "trace"         : "traceSymbol",
+            "getOrigRule"   : "getOrigRuleSymbol",
+            "getOrigTerm"   : "getOrigTermSymbol"
         }
 
         self._step_dict = {
@@ -55,10 +57,12 @@ class SearchHook(Hook):
             assn = top_module.parseTerm(f"{assn} ; {t}")
         return assn, Substitution(subst)
     
-    def _make_trace(self, module, path):
+    def _make_trace(self, meta_module, module, path):
 
         nil, trace = self._get_symbol("nilTrace"), self._get_symbol("trace")
         step = self._get_symbol("traceStep")
+
+        oterm, orule = self._get_symbol("getOrigTerm"), self._get_symbol("getOrigRule")
 
         nilTerm = nil.makeTerm([])
         if len(path) <= 1:
@@ -70,17 +74,33 @@ class SearchHook(Hook):
         while len(path) > 0:
             # get state
             s, c = path.pop(0)
-            
-            children = [arg for arg in s.arguments()]
-			
-            assert len(children) <= 1
 
-            t = children[0]
+            # ignore if reached final
+            if len(path) <= 0:
+                break
+
+            rule = path.pop(0)
             
             # get metaRepr
-            u_s, u_c = module.upTerm(t), module.upTerm(self.conv.term2dag(c))
+            u_s, u_c = meta_module.upTerm(s), meta_module.upTerm(self.conv.term2dag(c))
+            
+            # get original term
+            u_s = oterm.makeTerm([u_s])
+            u_s.reduce()
 
-            cur = step.makeTerm([u_s, u_c])
+            # get down term
+            d_s = module.downTerm(u_s)
+            d_s.reduce()
+
+            u_t = meta_module.upSort(d_s)
+
+            # get original rule
+            u_r = self._up_rule(meta_module, rule)
+            u_r = orule.makeTerm([u_r])
+            u_r.reduce()
+
+            # make trace step
+            cur = step.makeTerm([u_s, u_c, u_t, u_r])
             
             tot = trace.makeTerm([prev, cur])
             prev = tot
@@ -89,6 +109,55 @@ class SearchHook(Hook):
             return nilTerm
         
         return tot
+    
+    def _up_rule(self, module, rule):
+        
+        lhs = module.upTerm(rule.getLhs())        
+        rhs = module.upTerm(rule.getRhs())
+
+        termk = module.findSort('Term').kind()
+        attsk = module.findSort('AttrSet').kind()
+        rulek = module.findSort('Rule').kind()
+        condk = module.findSort('Condition').kind()
+        attrk = module.findSort('Attr').kind()
+        qqidk = module.findSort('Qid').kind()
+
+        lbSymbol = module.findSymbol('label', [qqidk], attrk)
+        lb = lbSymbol.makeTerm([module.parseTerm(f"'{rule.getLabel()}")])
+
+        if rule.hasCondition():
+            cond = self._up_cond(module, rule)
+            rlSymbol = module.findSymbol('crl_=>_if_[_].', [termk, termk, condk, attsk], rulek)
+
+            return rlSymbol.makeTerm([lhs, rhs, cond, lb])
+        else:
+            rlSymbol = module.findSymbol('rl_=>_[_].', [termk, termk, attsk], rulek)
+
+            return rlSymbol.makeTerm([lhs, rhs, lb])
+
+    def _up_cond(self, module, rule):
+        termk = module.findSort('Term').kind()
+        eqCondk = module.findSort('EqCondition').kind()
+        condk = module.findSort('Condition').kind()
+        
+        eqSymbol = module.findSymbol('_=_', [termk, termk], eqCondk)
+        conjSymbol = module.findSymbol('_/\_', [condk, condk], condk)
+        nilSymbol = module.findSymbol('nil', [], eqCondk)
+
+        c_l = nilSymbol.makeTerm([])
+
+        for cond in rule.getCondition():
+            
+            # currently only consider equality condition
+            if isinstance(cond, EqualityConditionFragment):
+                
+                l = module.upTerm(cond.getLhs())
+                r = module.upTerm(cond.getRhs())
+
+                c = eqSymbol.makeTerm([l, r])
+                c_l = conjSymbol.makeTerm([c_l, c])
+        
+        return c_l            
 
     def run(self, term, data):
         # reduce arguments
@@ -171,7 +240,7 @@ class SearchHook(Hook):
             if cur_n == sol_num:
 
                 if self._is_path:
-                    return self._make_trace(symbol_mo, path())
+                    return self._make_trace(symbol_mo, module, path())
 
                 else:
                     # print(sol, " with ", nrew)

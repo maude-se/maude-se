@@ -84,6 +84,7 @@ build_src() {
   cp "$src_dir/maude/smtStateTransitionGraph.hh" "$maude_src_dir/SMT"
   cp "$src_dir/maude/rewriteSmtSearch.cc" "$maude_src_dir/Mixfix"
   cp "$src_dir/swig/rwsmt.i" "$swig_src_dir"
+  cp "$src_dir/swig/module.i" "$swig_src_dir"
   cp "$src_dir/swig/python.i" "$swig_src_dir/specific"
 
   cd maude-bindings 

@@ -88,6 +88,8 @@ omod MAUDE-SE-META-INTERPRETER is
   var CO : Constant .
   var MO : Module .
   var ST : Trace2 .
+  var RL : Rule .
+  vars CD CD' : Condition .
 
   op o : -> Oid .
 
@@ -260,10 +262,21 @@ omod MAUDE-SE-META-INTERPRETER is
 
   op trace2str : Module Trace2? -> String .
   eq trace2str(MO, failure) = "Failed to get path.\n\n" .
-  eq trace2str(MO, (T || T') ST) = printTokens(
+  eq trace2str(MO, {T || T', TY, RL} ST) = printTokens(
     '`{ metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '`, '\n 
-       metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '`} '\n) + trace2str(MO, ST) .
+        metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '`, '\n 
+        TY '`, '\n 
+        printRule(MO, RL) '`} '\n) + trace2str(MO, ST) .
   eq trace2str(MO, nil) = "" .
+
+  op printRule : Module Rule -> QidList .
+  eq printRule(MO, rl T => T' [label(QI)] .) = 'rl '`[ QI '`] ': metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '=> metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) .
+  eq printRule(MO, crl T => T' if CD [label(QI)] .) = 'crl '`[ QI '`] ': metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '=> metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) 'if printCond(MO, CD) .
+
+  op printCond : Module Condition -> QidList .
+  eq printCond(MO, nil) = nil .
+  eq printCond(MO, T = T') = metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '= metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) .
+  eq printCond(MO, CD /\ CD') = printCond(MO, CD) '/\ printCond(MO, CD') .
 
 endom
 
