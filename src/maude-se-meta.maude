@@ -34,6 +34,7 @@ fmod MAUDE-SE-SYNTAX is
   op check`in_:_using_. : NaBubble Bubble Bubble -> Command .
   op show`assn`. : -> Command .
   op show`path`. : -> Command .
+  op show`sym-path`. : -> Command .
 endfm
 
 fmod MAUDE-SE-PRELUDE is
@@ -90,6 +91,7 @@ omod MAUDE-SE-META-INTERPRETER is
   var ST : Trace2 .
   var RL : Rule .
   vars CD CD' : Condition .
+  var TR : Trace2 .
 
   op o : -> Oid .
 
@@ -258,16 +260,39 @@ omod MAUDE-SE-META-INTERPRETER is
   => < O : MaudeSE | state : 30 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearchPath(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, getNum(NT), LO, B))) .
 
   rl < O : MaudeSE | state : 30, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
-  => < O : MaudeSE | state : 2 > getLine(stdin, O, trace2str(upModule(MN, false), downTerm(T, (failure).Trace2?)) + "MaudeSE> ") .
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, ctrace2str(upModule(MN, false), downTerm(T, (failure).Trace2Result?)) + "\n" + "MaudeSE> ") .
 
-  op trace2str : Module Trace2? -> String .
+  rl < O : MaudeSE | state : 6, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), logic : LO, search-fold : B > processInput(O, 'show`sym-path`..Command)
+  => < O : MaudeSE | state : 35 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearchPath(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, getNum(NT), LO, B))) .
+
+  rl < O : MaudeSE | state : 35, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
+  => < O : MaudeSE | state : 2 > getLine(stdin, O, trace2str(upModule(MN, false), downTerm(T, (failure).Trace2Result?)) + "\n" + "MaudeSE> ") .
+
+  op ctrace2str : Module Trace2Result? -> String .
+  eq ctrace2str(MO, failure) = "Failed to get path.\n\n" .
+  eq ctrace2str(MO, {TR, SUBS}) = $ctrace2str(MO, TR, SUBS) .
+
+  op $ctrace2str : Module Trace2 Substitution -> String .
+  eq $ctrace2str(MO, nil, SUBS) = "" .
+  eq $ctrace2str(MO, {T || T', TY}, SUBS) = printTokens(metaPrettyPrint(MO, getVars(inst(T, SUBS)), inst(T, SUBS), mixfix with-parens) '\n) .
+  ceq $ctrace2str(MO, {T || T', TY, RL} ST, SUBS) = printTokens(
+    metaPrettyPrint(MO, getVars(T''), T'', mixfix with-parens) '\n
+    '=====`[ printRule(MO, RL) '`]=====> '\n) + $ctrace2str(MO, ST, SUBS)
+   if T'' := inst(T, SUBS) .
+
+  op trace2str : Module Trace2Result? -> String .
   eq trace2str(MO, failure) = "Failed to get path.\n\n" .
-  eq trace2str(MO, {T || T', TY, RL} ST) = printTokens(
-    '`{ metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '`, '\n 
-        metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '`, '\n 
-        TY '`, '\n 
-        printRule(MO, RL) '`} '\n) + trace2str(MO, ST) .
-  eq trace2str(MO, nil) = "" .
+  eq trace2str(MO, {TR, SUBS}) = $trace2str(MO, TR) .
+
+  op $trace2str : Module Trace2 -> String .
+  eq $trace2str(MO, {T || T', TY} ST) = printTokens(
+    '`{ metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '|| '\n 
+        metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '`} '\n) .
+  eq $trace2str(MO, {T || T', TY, RL} ST) = printTokens(
+    '`{ metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '|| '\n 
+        metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '`} '\n 
+        '=====`[ printRule(MO, RL) '`]=====> '\n) + $trace2str(MO, ST) .
+  eq $trace2str(MO, nil) = "" .
 
   op printRule : Module Rule -> QidList .
   eq printRule(MO, rl T => T' [label(QI)] .) = 'rl '`[ QI '`] ': metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '=> metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) .

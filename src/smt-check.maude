@@ -258,6 +258,12 @@ fmod META-AUX is
   vars MO LB : Qid .
   var CD : Condition .
   var RL : Rule .
+  var F : Qid .
+  var TL : TermList .
+  var NTL : NeTermList .
+  var SUBS : Substitution .
+  var V : Variable .
+  var C : Constant .
 
   sort Rule? .
   subsort Rule < Rule? .
@@ -279,6 +285,13 @@ fmod META-AUX is
   --- eq pickRule(crl T => T' if CD [label(LB) ATTR]. RS, LB) = crl T => T' [label(LB) ATTR]. .
   --- eq pickRule(RL RS, LB) = pickRule(RS, LB) [owise] .
   --- eq pickRule(none) = noRule .
+
+  op inst : TermList Substitution -> TermList .
+  eq inst(V, V <- T ; SUBS) = T .
+  eq inst(C, SUBS) = C .
+  eq inst(F[TL], SUBS) = F[inst(TL, SUBS)] .
+  eq inst((T, NTL), SUBS) = inst(T, SUBS), inst(NTL, SUBS) .
+  eq inst(empty, SUBS) = empty .
 
 endfm
 
@@ -317,32 +330,40 @@ fmod META-SMT-SEARCH2 is
               op-hook failureSymbol         (failure : ~> SmtResult2?)
               op-hook resultSymbol          ({_,_,_,_,_} : Term Substitution Term Term Nat ~> SmtResult2))].
 
-  sorts TraceStep2 Trace2 Trace2? .
-  subsort TraceStep2 < Trace2 < Trace2? .
+  sorts TraceStep2 Trace2 .
+  subsort TraceStep2 < Trace2 .
 
-  op failure : -> Trace2? [ctor] .
   op {_||_,_,_} : Term Term Type Rule -> TraceStep2 [ctor] .
+  op {_||_,_} : Term Term Type -> TraceStep2 [ctor] .
   op nil : -> Trace2 [ctor] .
   op __ : Trace2 Trace2 -> Trace2 [ctor assoc id: nil format (d n d)] .
 
-  op metaSmtSearchPath : Module Term Term Condition Qid Bound Nat Qid Bool Bool -> Trace2? .
+  sorts Trace2Result Trace2Result? .
+  subsort Trace2Result < Trace2Result? .
+  
+  op {_,_} : Trace2 Substitution -> Trace2Result [ctor] .
+  op failure : -> Trace2Result? [ctor] .
+
+  op metaSmtSearchPath : Module Term Term Condition Qid Bound Nat Qid Bool Bool -> Trace2Result? .
   eq metaSmtSearchPath(M, T, T', COND, STEP, B, N, LOGIC, FOLD, MERGE)
    = metaSmtSearchPathInternal(transform(M), makeConstTerm(T), makeConstTerm(T'), COND, STEP, B, N, LOGIC, FOLD, MERGE) .
 
-  op metaSmtSearchPath : Module Term Term Condition Qid Bound Nat Qid -> Trace2? .
+  op metaSmtSearchPath : Module Term Term Condition Qid Bound Nat Qid -> Trace2Result? .
   eq metaSmtSearchPath(M, T, T', COND, STEP, B, N, LOGIC)
    = metaSmtSearchPath(M, T, T', COND, STEP, B, N, LOGIC, false, false) .
 
-  op metaSmtSearchPath : Module Term Term Condition Qid Bound Nat Qid Bool -> Trace2? .
+  op metaSmtSearchPath : Module Term Term Condition Qid Bound Nat Qid Bool -> Trace2Result? .
   eq metaSmtSearchPath(M, T, T', COND, STEP, B, N, LOGIC, FOLD)
    = metaSmtSearchPath(M, T, T', COND, STEP, B, N, LOGIC, FOLD, false) .
 
-  op metaSmtSearchPathInternal : Module Term Term Condition Qid Bound Nat Qid Bool Bool -> Trace2?
+  op metaSmtSearchPathInternal : Module Term Term Condition Qid Bound Nat Qid Bool Bool -> Trace2Result?
     [special (id-hook SpecialHubSymbol      (SmtSearchPathSymbol)
-              op-hook failureSymbol         (failure : ~> Trace2?)
               op-hook traceStepSymbol       ({_||_,_,_} : Term Term Type Rule ~> TraceStep2)
+              op-hook traceStepRootSymbol   ({_||_,_} : Term Term Type ~> TraceStep2)
               op-hook nilTraceSymbol        (nil : ~> Trace2)
               op-hook traceSymbol           (__ : Trace2 Trace2 ~> Trace2)
+              op-hook failureSymbol         (failure : ~> Trace2Result?)
+              op-hook traceResultSymbol     ({_,_} : Trace2 Substitution ~> Trace2Result)
               op-hook getOrigRuleSymbol     (getOrigRule : Rule ~> Rule)
               op-hook getOrigTermSymbol     (getOrigTerm : Term ~> Term))] .
 

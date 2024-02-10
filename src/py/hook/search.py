@@ -16,8 +16,10 @@ class SearchHook(Hook):
             "fail"          : "failureSymbol",
             "success"       : "resultSymbol",
             "traceStep"     : "traceStepSymbol",
+            "traceStepRoot" : "traceStepRootSymbol",
             "nilTrace"      : "nilTraceSymbol",
             "trace"         : "traceSymbol",
+            "traceResult"   : "traceResultSymbol",
             "getOrigRule"   : "getOrigRuleSymbol",
             "getOrigTerm"   : "getOrigTermSymbol"
         }
@@ -60,7 +62,7 @@ class SearchHook(Hook):
     def _make_trace(self, meta_module, module, path):
 
         nil, trace = self._get_symbol("nilTrace"), self._get_symbol("trace")
-        step = self._get_symbol("traceStep")
+        step, stepR = self._get_symbol("traceStep"), self._get_symbol("traceStepRoot")
 
         oterm, orule = self._get_symbol("getOrigTerm"), self._get_symbol("getOrigRule")
 
@@ -74,12 +76,6 @@ class SearchHook(Hook):
         while len(path) > 0:
             # get state
             s, c = path.pop(0)
-
-            # ignore if reached final
-            if len(path) <= 0:
-                break
-
-            rule = path.pop(0)
             
             # get metaRepr
             u_s, u_c = meta_module.upTerm(s), meta_module.upTerm(self.conv.term2dag(c))
@@ -94,7 +90,14 @@ class SearchHook(Hook):
 
             u_t = meta_module.upSort(d_s)
 
+            # ignore if reached final
+            if len(path) <= 0:
+                cur = stepR.makeTerm([u_s, u_c, u_t])
+                tot = trace.makeTerm([prev, cur])
+                break
+
             # get original rule
+            rule = path.pop(0)
             u_r = self._up_rule(meta_module, rule)
             u_r = orule.makeTerm([u_r])
             u_r.reduce()
@@ -239,14 +242,20 @@ class SearchHook(Hook):
 
             if cur_n == sol_num:
 
+                subst_t, subst = self._make_assn(symbol_mo)
+
                 if self._is_path:
-                    return self._make_trace(symbol_mo, module, path())
+                    return self._get_symbol("traceResult").makeTerm(
+                        [
+                            self._make_trace(symbol_mo, module, path()),
+                            subst_t
+                        ]
+                    )
 
                 else:
                     # print(sol, " with ", nrew)
                     # print("  # state explored : " + str(num))
                     
-                    subst_t, subst = self._make_assn(symbol_mo)
                     (s_t,) = sol.arguments()
 
                     ct = self.conv.term2dag(const)
