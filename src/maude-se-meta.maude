@@ -74,7 +74,7 @@ omod MAUDE-SE-META-INTERPRETER is
   vars C N : Nat .
   vars O O' Y MI : Oid .
   vars MN LO QI : Qid .
-  var STR : String .
+  var STR STR2 : String .
   var QIL : QidList .
   vars PT T T' T'' : Term .
   vars NT MT TH MM : Term .
@@ -177,21 +177,24 @@ omod MAUDE-SE-META-INTERPRETER is
 --- Show assignment command
 ---------------------------------------
 
-  rl < O : MaudeSE | state : 6, check-result : RES > processInput(O, 'show`assn`..Command)
-  => < O : MaudeSE | state : 15 > write(stdout, O, assn2str(RES)) .
+  rl < O : MaudeSE | state : 6, check-result : RES, mn : MN > processInput(O, 'show`assn`..Command)
+  => < O : MaudeSE | state : 15 > write(stdout, O, assn2str(upModule(MN, false), RES)) .
 
   rl < O : MaudeSE | state : 15 > wrote(O, O')
   => < O : MaudeSE | state : 2 > getLine(stdin, O, "MaudeSE> ") .
 
-  op assn2str : SmtCheckResult -> String .
-  eq assn2str(unknown) = "No assignment.\n\n" .
-  eq assn2str(true) = "The check sat result was true, but cannot show an assignment.\n\n" .
-  eq assn2str(false) = "error occurs while generating assignment.\n\n" .
-  eq assn2str(RES) = printTokens('\n 'assignment: '\n $assn2str(RES) '\n) .
+  op assn2str : Module SmtCheckResult -> String .
+  eq assn2str(MO, unknown) = "No assignment.\n\n" .
+  eq assn2str(MO, true) = "The check sat result was true, but cannot show an assignment.\n\n" .
+  eq assn2str(MO, false) = "error occurs while generating assignment.\n\n" .
+  eq assn2str(MO, RES) = "\n assignment: \n" + $assn2str(MO, RES) + "\n" .
 
-  op $assn2str : SmtCheckResult -> QidList .
-  eq $assn2str({(T |-> T'), ASSNS}) = '\t T '|--> T' '\n $assn2str({ASSNS}) .
-  eq $assn2str({empty}) = nil .
+  op $assn2str : Module SmtCheckResult -> String .
+  eq $assn2str(MO, {(T |-> T'), ASSNS}) = printTokens(
+    '\t metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '|--> 
+        metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) '\n) + $assn2str(MO, {ASSNS}) .
+  eq $assn2str(MO, {{STR |-> STR2}, ASSNS}) = "\t" + STR + " |--> " + STR2 + "\n" + $assn2str(MO, {ASSNS}) .
+  eq $assn2str(MO, {empty}) = "" .
 
 
 ---------------------------------------

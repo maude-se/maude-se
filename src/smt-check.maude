@@ -3,6 +3,7 @@ fmod SATISFYING-ASSIGNMENTS is
 
   sort SatAssignment .
   op _|->_ : Term Term -> SatAssignment [ctor] .
+  op {_|->_} : String String -> SatAssignment [ctor] .
 
   sort SatAssignmentSet .
   subsort SatAssignment < SatAssignmentSet .
@@ -25,10 +26,11 @@ fmod META-SMT-CHECK is
   op metaSmtCheck : Module Term Qid Bool -> SmtCheckResult
   [special (id-hook SpecialHubSymbol                   (SmtCheckerSymbol)
             op-hook unknownResultSymbol                (unknown : ~> SmtCheckResult)
-            op-hook smtAssignmentResultSymbol          ({_} : SatAssignmentSet ~> SmtCheckResult)
+            op-hook smtAssnResultSymbol                ({_} : SatAssignmentSet ~> SmtCheckResult)
             op-hook emptySatAssignmentSetSymbol        (empty : ~> SatAssignmentSet)
             op-hook concatSatAssignmentSetSymbol       (_,_ : SatAssignmentSet SatAssignmentSet ~> SatAssignmentSet)
             op-hook assnPairSymbol                     (_|->_ : Term Term ~> SatAssignment)
+            op-hook assnUnsupModelSymbol               ({_|->_} : String String ~> SatAssignment)
 
             term-hook builtinTrueTerm                  ((true).Bool)
             term-hook builtinFalseTerm                 ((false).Bool)
