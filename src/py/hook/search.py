@@ -144,6 +144,7 @@ class SearchHook(Hook):
         condk = module.findSort('Condition').kind()
         
         eqSymbol = module.findSymbol('_=_', [termk, termk], eqCondk)
+        assnSymbol = module.findSymbol('_:=_', [termk, termk], eqCondk)
         conjSymbol = module.findSymbol('_/\_', [condk, condk], condk)
         nilSymbol = module.findSymbol('nil', [], eqCondk)
 
@@ -152,12 +153,19 @@ class SearchHook(Hook):
         for cond in rule.getCondition():
             
             # currently only consider equality condition
-            if isinstance(cond, EqualityConditionFragment):
+            if isinstance(cond, EqualityCondition):
                 
                 l = module.upTerm(cond.getLhs())
                 r = module.upTerm(cond.getRhs())
 
                 c = eqSymbol.makeTerm([l, r])
+                c_l = conjSymbol.makeTerm([c_l, c])
+            
+            if isinstance(cond, AssignmentCondition):
+                l = module.upTerm(cond.getLhs())
+                r = module.upTerm(cond.getRhs())
+
+                c = assnSymbol.makeTerm([l, r])
                 c_l = conjSymbol.makeTerm([c_l, c])
         
         return c_l            

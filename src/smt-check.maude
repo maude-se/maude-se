@@ -106,7 +106,7 @@ fmod ABST-BUILTIN is
   protecting CONVERSION .
 
   sort TermAbstraction .
-  op {_,_,_} : TermList Condition Nat -> TermAbstraction [ctor format (b! o d d d d b! o)] .
+  op {_,_,_} : TermList TermList Nat -> TermAbstraction [ctor format (b! o d d d d b! o)] .
   
   var M : Module .
   var N N' N'' : Nat .
@@ -114,7 +114,7 @@ fmod ABST-BUILTIN is
   var TY : Type .
   var TYS : TypeSet .
   var C : Constant .
-  vars CD CD' : Condition .
+  vars CD CD' : TermList .
   vars V NV : Variable .
   var T : Term .
   vars TL TL' : TermList .
@@ -122,13 +122,13 @@ fmod ABST-BUILTIN is
 
   op abst : Module TermList Nat -> TermAbstraction [format (r! o)] .
 
-  eq abst(M, V, N) = {V, nil, 0} .
+  eq abst(M, V, N) = {V, empty, 0} .
 
-  ceq abst(M, C, N) = {C, nil, 0}
+  ceq abst(M, C, N) = {C, empty, 0}
   if TY := leastSort(M, C)
   /\ not TY in ('Boolean ; 'Integer ; 'Real) .
 
-  ceq abst(M, T, N) = {NV, NV = T, 1}
+  ceq abst(M, T, N) = {NV, '_===_[NV, T], 1}
   if not T :: Variable
   /\ not T :: Constant
   /\ TY := leastSort(M,T)
@@ -140,12 +140,12 @@ fmod ABST-BUILTIN is
   /\ not TY in ('Boolean ; 'Integer ; 'Real)
   /\ {TL', CD, N'} := abst(M, TL, N) .
 
-  ceq abst(M, (T, NTL), N) = {(TL,TL'), CD /\ CD', N' + N''}
+  ceq abst(M, (T, NTL), N) = {(TL,TL'), conj((CD, CD')), N' + N''}
   if { TL, CD, N' } := abst(M, T, N)
   /\ { TL', CD', N'' } := abst(M, NTL, N + N') .
 
-  eq abst(M, empty, N) = {empty, nil, 0} .
-  eq abst(M, T, N) = {T, nil, 0} [owise] .
+  eq abst(M, empty, N) = {empty, empty, 0} .
+  eq abst(M, T, N) = {T, empty, 0} [owise] .
 
 
 *** aux functions
@@ -153,14 +153,61 @@ fmod ABST-BUILTIN is
 *** while the output sort is extende type.
   op auxVarGen : Nat Type -> Variable .
   eq auxVarGen(N, TY) = qid("V" + string(N, 10) + ":" + string(TY)) .
+
+  op conj : TermList -> Term .
+  eq conj((T, NTL)) = '_and_[T, conj(NTL)] .
+  eq conj((T, nil)) = T .
+  eq conj(empty) = 'true.Boolean .
+  eq conj(T) = T [owise] .
 endfm
 
-fmod TRANSFORMATION is
-  inc ABST-BUILTIN .
-  pr CONVERSION .
+fmod RULE-TRANSFORM is
+  pr ABST-BUILTIN .
+
+  var M : Module .
+  vars L' R' : Term .
+  vars COND CND CND' : EqCondition .
+  var ATTR : AttrSet .
+  vars N N' N'' : Nat .
+  vars T T' CTL : Term .
+  var RS RS' : RuleSet .
+  vars RU RU' : Rule .
+  vars CD CD' : TermList .
+
+--- rule format
+--- rule condition is syntatically seperated
+  sort SepCondition .
+  op {_,_} : Condition TermList -> SepCondition [ctor] .
+
+  op sep : Condition -> SepCondition .
+  eq sep(CND /\ CTL = 'true.Boolean) = {CND, CTL} .
+  eq sep(CTL = 'true.Boolean /\ CND) = {CND, CTL} .
+  eq sep(CND) = {CND, empty} [owise] .
 
   sort TranslateResult .
   op {_,_} : Rule Nat -> TranslateResult [ctor] .
+
+  op trRule : Module Rule Nat -> TranslateResult . 
+  ceq trRule (M, crl T => T' if COND [ATTR]., N) =
+  	{ crl '`[_`][L'] => '`[_|_`]['`[_`][R'], conj((CD, CD', CTL))] if CND [nonexec ATTR]., N' + N'' }
+  if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N + N') /\ {CND, CTL} := sep(COND) .
+
+  ceq trRule (M, rl T => T' [ATTR]., N) =
+    { rl '`[_`][L'] => '`[_|_`]['`[_`][R'], conj((CD, CD'))] [nonexec ATTR]., N' + N''} 
+  if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N + N') .
+
+  op tr : Module RuleSet Nat -> RuleSet .
+  eq tr (M, none, N) = none .
+  ceq tr (M, RU RS, N) = normRule(RU') tr(M, RS, N + N') if { RU', N' } := trRule(M, RU, N) .
+
+  op normRule : Rule -> Rule .
+  eq normRule(crl T => T' if nil [ATTR].) = rl T => T' [ATTR]. .
+  eq normRule(RU) = RU [owise] .
+
+endfm
+
+fmod TRANSFORMATION is
+  pr RULE-TRANSFORM .
 
   vars TY TY' : Type .
   var TYS : TypeSet .
@@ -201,35 +248,6 @@ fmod TRANSFORMATION is
   
   op maxRuleSort : Module TypeSet -> Type .
   eq maxRuleSort (M, TY ; TYS) = maxRuleSort(M, TY, TYS) .
-
-  op toTermList : EqCondition -> TermList .
-  eq toTermList(nil) = 'true.Boolean .
-  eq toTermList(T = T') = '_===_[T, T'] .
-  eq toTermList(CD /\ CD') = '_and_[toTermList(CD), toTermList(CD')] .
-
-  op incCounter : Term Nat -> Term .
-  eq incCounter(T, 0) = T .
-  eq incCounter(T, N) = '_+_[T, upTerm(N)] [owise] .
-
-  op normRule : Rule -> Rule .
-  eq normRule(crl T => T' if nil [ATTR].) = rl T => T' [ATTR]. .
-  eq normRule(RU) = RU [owise] .
-
-
-  op trRule : Module Rule Nat -> TranslateResult . 
-  ceq trRule (M, crl T => T' if COND [ATTR]., N) =
-  	{ normRule(rl '`[_`][L'] => 
-    '`[_|_`]['`[_`][R'],'_and_['_and_[toTermList(CD), toTermList(COND)], toTermList(CD')]] [nonexec ATTR].), N' + N'' }
-  if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N + N').
-
-  ceq trRule (M, rl T => T' [ATTR]., N) =
-    { normRule(rl '`[_`][L'] => 
-    '`[_|_`]['`[_`][R'], '_and_[toTermList(CD), toTermList(CD')]] [nonexec ATTR].), N' + N''} 
-    if {L', CD, N'} := abst(M, T, N) /\ {R', CD', N''} := abst(M, T', N + N') .
-
-  op tr : Module RuleSet Nat -> RuleSet .
-  eq tr (M, none, N) = none .
-  ceq tr (M, RU RS, N) = RU' tr(M, RS, N + N') if { RU', N' } := trRule(M, RU, N) .
 
 --- TODO: need to add fmod, smod
 
@@ -274,6 +292,7 @@ fmod META-AUX is
 
   op getOrigRule : Rule -> Rule . 
   eq getOrigRule(rl '`[_`][T] => '`[_|_`]['`[_`][T'], CT] [ATTR].) = crl T => T' if CT = 'true.Boolean [ATTR]. .
+  eq getOrigRule(crl '`[_`][T] => '`[_|_`]['`[_`][T'], CT] if CD [ATTR].) = crl T => T' if CD /\ CT = 'true.Boolean [ATTR]. .
 
   op getOrigTerm : Term -> Term . 
   eq getOrigTerm('`[_`][T]) = T .

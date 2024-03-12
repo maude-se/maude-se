@@ -67,11 +67,23 @@ omod MAUDE-SE-META-INTERPRETER is
   inc MAYBE{Module} * (op maybe to null) .
   inc META-INTERPRETER .
 
+  sort SearchBound SearchBound? .
+  subsort SearchBound < SearchBound? .
+
+  op noSearchBound : -> SearchBound? .
+  op {_,_} : Nat Nat -> SearchBound [ctor] . 
+
+  sort SearchResult SearchResult? .
+  subsort SearchResult < SearchResult? .
+
+  op noSearchResult : -> SearchResult? .
+  op {_} : SmtResult2? -> SearchResult .
+
   class MaudeSE | mi : Maybe{Oid}, mn : Maybe{Qid}, logic : Maybe{Qid}, 
                   in : QidList, state : Nat, check-result : SmtCheckResult,
-                  search-info : TermList, search-fold : Bool .
+                  search-info : TermList, search-fold : Bool, search-bound : SearchBound?, search-result : SearchResult? .
 
-  vars C N : Nat .
+  vars C N N' : Nat .
   vars O O' Y MI : Oid .
   vars MN LO QI : Qid .
   var STR STR2 : String .
@@ -92,6 +104,8 @@ omod MAUDE-SE-META-INTERPRETER is
   var RL : Rule .
   vars CD CD' : Condition .
   var TR : Trace2 .
+  var SRES : SmtResult2 .
+  var SR : SearchResult? .
 
   op o : -> Oid .
 
@@ -99,7 +113,8 @@ omod MAUDE-SE-META-INTERPRETER is
 
   op maudeSE : -> Configuration .
   eq maudeSE = <>
-    < o : MaudeSE | mi : null, mn : null, logic : null, in : nil, state : 0, check-result : unknown, search-info : empty, search-fold : false >
+    < o : MaudeSE | mi : null, mn : null, logic : null, in : nil, state : 0, check-result : unknown, search-info : empty, search-fold : false, 
+                    search-bound : noSearchBound, search-result : noSearchResult >
     write(stdout, o, "\n\t MaudeSE Execution Environment\n\n")
     createInterpreter(interpreterManager, o, none) .
 
@@ -223,22 +238,37 @@ omod MAUDE-SE-META-INTERPRETER is
   => < O : MaudeSE | state : 23, search-info : (TL, PT) > parseTerm(MI, O, MN, none, downTerm(T'', 'default-name), anyType) .
 
 
-  rl < O : MaudeSE | state : 23, mi : MI, mn : MN, search-info : (NT, MT, T, T'), logic : LO, search-fold : B,
-                     in : ('smt-search`[_`,_`]in_:_=>_such`that_using_.[TL]) QIL > parsedTerm(O, MI, {T'', TY})
-  => < O : MaudeSE | state : 24, in : QIL, search-info : (NT, MT, T, T', T'') > 
-  reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearch2(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, getNum(NT), LO, B))) .
+  rl < O : MaudeSE | state : 23, mi : MI, mn : MN, search-info : (NT, MT, T, T'),
+                     in : ('smt-search`[_`,_`]in_:_=>_such`that_using_.[TL]) QIL, search-bound : noSearchBound > parsedTerm(O, MI, {T'', TY})
+  => < O : MaudeSE | state : 24, in : QIL, search-info : (NT, MT, T, T', T''), search-bound : {1, getNum(NT)} > .
 
 ---  clear prev
 
-  rl < O : MaudeSE | state : 24, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
-  => < O : MaudeSE | state : 2 > getLine(stdin, O, smtResult2str(upModule(MN, false), downTerm(T, (failure).SmtResult2?)) + "MaudeSE> ") .
+  rl < O : MaudeSE | state : 24, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), search-bound : {C, N}, logic : LO, search-fold : B >
+  => < O : MaudeSE | state : 25, search-info : (NT, MT, T, T', T'') > 
+    reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearch2(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, C, LO, B))) .
+
+  rl < O : MaudeSE | state : 25, mi : MI, mn : MN, search-bound : {C, N} > reducedTerm(O, MI, N', T, TY)
+  => < O : MaudeSE | state : 26, search-result : {downTerm(T, (failure).SmtResult2?)} > write(stdout, O, smtResult2str(upModule(MN, false), C, downTerm(T, (failure).SmtResult2?))) .
+
+  crl < O : MaudeSE | state : 26, search-bound : {C, N}, search-result : SR > wrote(O, O')
+   => < O : MaudeSE | state : 24, search-bound : {C + 1, N} > if check(C, N, SR) .
+
+  crl < O : MaudeSE | state : 26, search-bound : {C, N}, search-result : SR > wrote(O, O')
+   => < O : MaudeSE | state : 2, search-bound : noSearchBound, search-result : noSearchResult > 
+      getLine(stdin, O, "MaudeSE> ") if not check(C, N, SR) .
 
   op getNum : Qid -> Nat .
   eq getNum(QI) = downTerm(qid("s_^" + string(downTerm(QI, QI)))['0.Zero], (0).Nat) .
 
-  op smtResult2str : Module SmtResult2? -> String .
-  eq smtResult2str(MO, failure) = "Failed to perform rewriting modulo SMT.\n\n" .
-  eq smtResult2str(MO, {T, SUBS, T', T'', N}) = printTokens(
+  op check : Nat Nat SearchResult? -> Bool .
+  eq check(C, N, {failure}) = false .
+  eq check(C, N, {SRES}) = C < N .
+
+  op smtResult2str : Module Nat SmtResult2? -> String .
+  eq smtResult2str(MO, C, failure) = "No more solutions.\n\n" .
+  eq smtResult2str(MO, C, {T, SUBS, T', T'', N}) = printTokens(
+    'Solution qid(string(C, 10) + " ") '`( 'state qid(" " + string(N, 10)) '`) '\n
     'Symbolic 'state: metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '\n
     'Constraint: metaPrettyPrint(MO, getVars(T''), T'', mixfix with-parens) '\n 
     'Substitution: printSubst(MO, SUBS) '\n
@@ -298,13 +328,16 @@ omod MAUDE-SE-META-INTERPRETER is
   eq $trace2str(MO, nil) = "" .
 
   op printRule : Module Rule -> QidList .
-  eq printRule(MO, rl T => T' [label(QI)] .) = 'rl '`[ QI '`] ': metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '=> metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) .
-  eq printRule(MO, crl T => T' if CD [label(QI)] .) = 'crl '`[ QI '`] ': metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '=> metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) 'if printCond(MO, CD) .
+  --- eq printRule(MO, rl T => T' [label(QI)] .) = 'rl '`[ QI '`] ': metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '=> metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) .
+  --- eq printRule(MO, crl T => T' if CD [label(QI)] .) = 'crl '`[ QI '`] ': metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '=> metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) 'if printCond(MO, CD) .
+  eq printRule(MO, rl T => T' [label(QI)] .) = QI .
+  eq printRule(MO, crl T => T' if CD [label(QI)] .) = QI .
 
   op printCond : Module Condition -> QidList .
   eq printCond(MO, nil) = nil .
   eq printCond(MO, T = T') = metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '= metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) .
   eq printCond(MO, CD /\ CD') = printCond(MO, CD) '/\ printCond(MO, CD') .
+  eq printCond(MO, T := T') = metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) ':= metaPrettyPrint(MO, getVars(T'), T', mixfix with-parens) .
 
 endom
 
