@@ -12,6 +12,7 @@
 #include "folder.hh"
 
 #include "variableDagNode.hh"
+#include "freeDagNode.hh"
 #include "SMT_EngineWrapper.hh"
 
 #include "Python.h"
@@ -145,6 +146,8 @@ protected:
 
   PyObject *dag2term;
   PyObject *term2dag;
+  PyObject *mkApp;
+  PyObject *getSymbol;
 
   // Connector
   PyObject *add_const;
@@ -170,6 +173,7 @@ protected:
   double nextTime;
   double rewriteTime;
   double elseTime;
+  double dagTime;
 
 protected:
   PyObject *convDag2Term(DagNode *dag);
@@ -279,20 +283,64 @@ inline DagNode *SmtStateTransitionGraph::maudeTerm2dag(PyObject *term)
   return dag;
 }
 
+// inline PyObject *SmtStateTransitionGraph::convDag2Term(DagNode *dag)
+// {
+//   // call Python the dag2Term method of the Converter class
+//   PyObject *maudeTerm = dag2maudeTerm(dag);
+//   clock_t loop_s = clock();
+//   PyObject *term = PyObject_CallMethodObjArgs(termConverter, dag2term, maudeTerm, NULL);
+//   clock_t loop_e = clock();
+//   elseTime += (double)(loop_e - loop_s);
+//   if (term == nullptr)
+//   {
+//     IssueWarning("failed to call Converter's dag2term for " << dag);
+//   }
+//   // remove a maude object
+//   // Py_DECREF(maudeTerm);
+//   Py_XINCREF(term);
+//   return term;
+// }
+
 inline PyObject *SmtStateTransitionGraph::convDag2Term(DagNode *dag)
 {
-  // call Python the dag2Term method of the Converter class
+
   PyObject *maudeTerm = dag2maudeTerm(dag);
-  clock_t loop_s = clock();
-  PyObject *term = PyObject_CallMethodObjArgs(termConverter, dag2term, maudeTerm, NULL);
-  clock_t loop_e = clock();
-  elseTime += (double)(loop_e - loop_s);
-  if (term == nullptr)
-  {
-    IssueWarning("failed to call Converter's dag2term for " << dag);
+ 
+  int nrArgs = dag->symbol()->arity();
+  
+  if (nrArgs <= 0){
+    PyObject *term = PyObject_CallMethodObjArgs(termConverter, dag2term, maudeTerm, NULL);
+    if (term == nullptr)
+    {
+      IssueWarning("failed to call Converter's dag2term for " << dag);
+    }
+    Py_XINCREF(term);
+    return term;
   }
-  // remove a maude object
-  // Py_DECREF(maudeTerm);
+
+  PyObject *op = PyObject_CallMethodObjArgs(termConverter, getSymbol, maudeTerm, NULL);
+
+  if (op == nullptr){
+    IssueWarning("failed to get symbol");
+  }
+  
+  PyObject* exprs = PyTuple_New(nrArgs);
+
+  FreeDagNode *f = safeCast(FreeDagNode*, dag);
+  for (int i = 0; i < nrArgs; ++i) {
+    PyObject* e = convDag2Term(f->getArgument(i));
+    int r = PyTuple_SetItem(exprs, i, e);
+    if (r < 0){
+      IssueWarning("index out of range");
+    }
+  }
+
+  PyObject *term = PyObject_CallMethodObjArgs(termConverter, mkApp, op, exprs, NULL);
+  
+  if (term == nullptr){
+    IssueWarning("failed to call mkApp " << dag);
+  }
+
   Py_XINCREF(term);
   return term;
 }

@@ -75,6 +75,8 @@ SmtStateTransitionGraph::SmtStateTransitionGraph(RewritingContext *initial,
 
 	dag2term = Py_BuildValue("s", "dag2term");
 	term2dag = Py_BuildValue("s", "term2dag");
+	mkApp = Py_BuildValue("s", "mkApp");
+	getSymbol = Py_BuildValue("s", "getSymbol");
 
 	makeConjunct = Py_BuildValue("s", "makeConjunct");
 	makeEq = Py_BuildValue("s", "makeEq");
@@ -115,6 +117,7 @@ SmtStateTransitionGraph::SmtStateTransitionGraph(RewritingContext *initial,
 
 	nextTime = 0.0;
 	rewriteTime = 0.0;
+	dagTime = 0.0;
 }
 
 SmtStateTransitionGraph::~SmtStateTransitionGraph()
@@ -262,15 +265,30 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 			// accumulated constraints
 			PyObject *acc = consTermSeen[n->hashConsIndex][n->constTermIndex]->constraint;
 			// we have pair of terms (norm, prev)
+
+			clock_t r_sd = clock();
 			PyObject *cur = convDag2Term(c2);
+			clock_t e_sd = clock();
+
+			double delta = (double)((e_sd - r_sd));
+			dagTime += delta;
+
+			// cout << "dag : " << endl;
+			// cout << c2 << endl;
+			// cout << "cur time : " << delta << " ms, acc dag time : " << dagTime << " ms" << endl;
+			// cout << "--------------------" << endl;
 
 			Py_XINCREF(acc);
 
+			// clock_t r_sd1 = clock();
 			PyObject *result = PyObject_CallMethodObjArgs(connector, check_sat, acc, cur, NULL);
 			if (result == nullptr)
 			{
 				IssueWarning("failed to check constraint");
 			}
+			// clock_t e_sd1 = clock();
+			// double delta1 = (double)((e_sd1 - r_sd1));
+			// // cout << "check constraint : " << delta1 << " ms" << endl;
 
 			if (PyObject_RichCompareBool(result, Py_True, Py_EQ) <= 0)
 			{
@@ -284,9 +302,10 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 			int index2;
 			bool needMerge = !fold;
 
+			// cout << "counter " << counter << ", stateNr " << stateNr << endl;
 			DagNode *reprDag;
 			// folding case ...
-			if (stateCollection.insertState(counter, c1, NONE, &index2))
+			if (stateCollection.insertState(counter, c1, n->hashConsIndex, &index2))
 			{
 				reprDag = c1;
 				if (!merge)
@@ -306,35 +325,35 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 
 					Py_XINCREF(next);
 
-					PyObject *objectsRepresentation00 = PyObject_Repr(next);
-					const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
+					// PyObject *objectsRepresentation00 = PyObject_Repr(next);
+					// const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
 
-					PyObject *objectsRepresentation11 = PyObject_Repr(acc);
-					const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
+					// PyObject *objectsRepresentation11 = PyObject_Repr(acc);
+					// const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
 
-					PyObject *objectsRepresentation22 = PyObject_Repr(cur);
-					const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
+					// PyObject *objectsRepresentation22 = PyObject_Repr(cur);
+					// const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
 
-					Py_XDECREF(objectsRepresentation00);
-					Py_XDECREF(objectsRepresentation11);
-					Py_XDECREF(objectsRepresentation22);
+					// Py_XDECREF(objectsRepresentation00);
+					// Py_XDECREF(objectsRepresentation11);
+					// Py_XDECREF(objectsRepresentation22);
 
-					const void *address = static_cast<const void *>(newState->dag);
-					std::stringstream strs;
-					strs << address;
-					string adrId = strs.str();
+					// const void *address = static_cast<const void *>(newState->dag);
+					// std::stringstream strs;
+					// strs << address;
+					// string adrId = strs.str();
 
-					Verbose("  new State " << counter << " added");
-					Verbose("  dag : ");
-					Verbose("  " << newState->dag);
-					Verbose("  address : ");
-					Verbose("  " << adrId.c_str());
-					Verbose("  acc : ");
-					Verbose("  " << ss11);
-					Verbose("  cur : ");
-					Verbose("  " << ss22);
-					Verbose("  and : ");
-					Verbose("  " << ss00);
+					// Verbose("  new State " << counter << " added");
+					// Verbose("  dag : ");
+					// Verbose("  " << newState->dag);
+					// Verbose("  address : ");
+					// Verbose("  " << adrId.c_str());
+					// Verbose("  acc : ");
+					// Verbose("  " << ss11);
+					// Verbose("  cur : ");
+					// Verbose("  " << ss22);
+					// Verbose("  and : ");
+					// Verbose("  " << ss00);
 
 					ConstrainedTerm *t = new ConstrainedTerm(c1, next);
 					t->dag->mark();
@@ -388,7 +407,7 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 						if (PyObject_RichCompareBool(subsumedResult, Py_True, Py_EQ) > 0)
 						{
 							Verbose("constraints subsumed by another");
-							nextState = map2seen[make_tuple(index2, cc)];
+							// nextState = map2seen[make_tuple(index2, cc)];
 							exists = true;
 							needMerge = false;
 							break;
@@ -410,11 +429,6 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 						newState->dag = reprDag;
 						newState->depth = n->depth + 1;
 
-						stringstream pyId;
-						pyId << counter;
-						pyId << "-";
-						pyId << newState->constTermIndex;
-
 						PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
 						if (next == nullptr)
 						{
@@ -423,28 +437,28 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 
 						Py_XINCREF(next);
 
-						PyObject *objectsRepresentation00 = PyObject_Repr(next);
-						const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
+						// PyObject *objectsRepresentation00 = PyObject_Repr(next);
+						// const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
 
-						PyObject *objectsRepresentation11 = PyObject_Repr(acc);
-						const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
+						// PyObject *objectsRepresentation11 = PyObject_Repr(acc);
+						// const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
 
-						PyObject *objectsRepresentation22 = PyObject_Repr(cur);
-						const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
+						// PyObject *objectsRepresentation22 = PyObject_Repr(cur);
+						// const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
 
-						Py_XDECREF(objectsRepresentation00);
-						Py_XDECREF(objectsRepresentation11);
-						Py_XDECREF(objectsRepresentation22);
+						// Py_XDECREF(objectsRepresentation00);
+						// Py_XDECREF(objectsRepresentation11);
+						// Py_XDECREF(objectsRepresentation22);
 
-						Verbose("  new State " << counter << " added");
-						Verbose("  dag : ");
-						Verbose("  " << newState->dag);
-						Verbose("  acc : ");
-						Verbose("  " << ss11);
-						Verbose("  cur : ");
-						Verbose("  " << ss22);
-						Verbose("  and : ");
-						Verbose("  " << ss00);
+						// Verbose("  new State " << counter << " added");
+						// Verbose("  dag : ");
+						// Verbose("  " << newState->dag);
+						// Verbose("  acc : ");
+						// Verbose("  " << ss11);
+						// Verbose("  cur : ");
+						// Verbose("  " << ss22);
+						// Verbose("  and : ");
+						// Verbose("  " << ss00);
 
 						ConstrainedTerm *t = new ConstrainedTerm(c1, next);
 						t->dag->mark();
@@ -458,6 +472,11 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 					{
 						needMerge = true;
 					}
+				}
+				else
+				{
+					// otherwise find another
+					continue;
 				}
 			}
 
