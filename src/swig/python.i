@@ -188,6 +188,7 @@ __version__ = '1.2.3'
 	def __next__(self):
 		term = self.__next()
 		if term is None:
+			# print("c rewrite : {}".format(self.getRewriteCount()))
 			raise StopIteration
 		
 		stateNr = self.getStateNr()

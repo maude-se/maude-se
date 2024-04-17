@@ -30,11 +30,11 @@ fmod MAUDE-SE-SYNTAX is
 
   op select_. : Bubble -> Command .
   op smt-search`[_`,_`]in_:_=>_such`that_using_. : Bubble Bubble NaBubble Bubble Bubble Bubble Bubble -> Command .
-  op fsmt-search`[_`,_`]in_:_=>_such`that_using_. : Bubble Bubble NaBubble Bubble Bubble Bubble Bubble -> Command .
+  op `{fold`}smt-search`[_`,_`]in_:_=>_such`that_using_. : Bubble Bubble NaBubble Bubble Bubble Bubble Bubble -> Command .
   op check`in_:_using_. : NaBubble Bubble Bubble -> Command .
-  op show`assn`. : -> Command .
-  op show`path`. : -> Command .
-  op show`sym-path`. : -> Command .
+  op show`model`. : -> Command .
+  op show`smt-path`concrete_. : Bubble -> Command .
+  op show`smt-path`symbolic_. : Bubble -> Command .
 endfm
 
 fmod MAUDE-SE-PRELUDE is
@@ -192,7 +192,7 @@ omod MAUDE-SE-META-INTERPRETER is
 --- Show assignment command
 ---------------------------------------
 
-  rl < O : MaudeSE | state : 6, check-result : RES, mn : MN > processInput(O, 'show`assn`..Command)
+  rl < O : MaudeSE | state : 6, check-result : RES, mn : MN > processInput(O, 'show`model`..Command)
   => < O : MaudeSE | state : 15 > write(stdout, O, assn2str(upModule(MN, false), RES)) .
 
   rl < O : MaudeSE | state : 15 > wrote(O, O')
@@ -220,7 +220,7 @@ omod MAUDE-SE-META-INTERPRETER is
   => < O : MaudeSE | state : 20, mn : downTerm(MM, 'default-name), in : QIL ('smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]]),
                      search-fold : false > insertModule(MI, O, upModule(downTerm(MM, 'default-name), true)) .
 
-  rl < O : MaudeSE | state : 6, mi : MI, in : QIL > processInput(O, 'fsmt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]])
+  rl < O : MaudeSE | state : 6, mi : MI, in : QIL > processInput(O, '`{fold`}smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]])
   => < O : MaudeSE | state : 20, mn : downTerm(MM, 'default-name), in : QIL ('smt-search`[_`,_`]in_:_=>_such`that_using_.['bubble[NT], 'bubble[MT], 'naBubble[MM], 'bubble[T], 'bubble[T'], 'bubble[T''], 'bubble[TH]]),
                      search-fold : true > insertModule(MI, O, upModule(downTerm(MM, 'default-name), true)) .
 
@@ -246,7 +246,7 @@ omod MAUDE-SE-META-INTERPRETER is
 
   rl < O : MaudeSE | state : 24, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), search-bound : {C, N}, logic : LO, search-fold : B >
   => < O : MaudeSE | state : 25, search-info : (NT, MT, T, T', T'') > 
-    reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearch2(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, C, LO, B))) .
+    reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearch2(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, getNum(MT), C, LO, B))) .
 
   rl < O : MaudeSE | state : 25, mi : MI, mn : MN, search-bound : {C, N} > reducedTerm(O, MI, N', T, TY)
   => < O : MaudeSE | state : 26, search-result : {downTerm(T, (failure).SmtResult2?)} > write(stdout, O, smtResult2str(upModule(MN, false), C, downTerm(T, (failure).SmtResult2?))) .
@@ -268,7 +268,7 @@ omod MAUDE-SE-META-INTERPRETER is
   op smtResult2str : Module Nat SmtResult2? -> String .
   eq smtResult2str(MO, C, failure) = "No more solutions.\n\n" .
   eq smtResult2str(MO, C, {T, SUBS, T', T'', N}) = printTokens(
-    'Solution qid(string(C, 10) + " ") '`( 'state qid(" " + string(N, 10)) '`) '\n
+    'Solution qid(string(C, 10) + " ") '\s '`( 'state qid(" " + string(N, 10)) '`) '\n
     'Symbolic 'state: metaPrettyPrint(MO, getVars(T), T, mixfix with-parens) '\n
     'Constraint: metaPrettyPrint(MO, getVars(T''), T'', mixfix with-parens) '\n 
     'Substitution: printSubst(MO, SUBS) '\n
@@ -289,14 +289,14 @@ omod MAUDE-SE-META-INTERPRETER is
 --- SMT search path command
 ---------------------------------------
 
-  rl < O : MaudeSE | state : 6, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), logic : LO, search-fold : B > processInput(O, 'show`path`..Command)
-  => < O : MaudeSE | state : 30 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearchPath(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, getNum(NT), LO, B))) .
+  rl < O : MaudeSE | state : 6, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), logic : LO, search-fold : B > processInput(O, 'show`smt-path`concrete_.['bubble[PT]])
+  => < O : MaudeSE | state : 30 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearchPath(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, getNum(MT), getNum(PT), LO, B))) .
 
   rl < O : MaudeSE | state : 30, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
   => < O : MaudeSE | state : 2 > getLine(stdin, O, ctrace2str(upModule(MN, false), downTerm(T, (failure).Trace2Result?)) + "\n" + "MaudeSE> ") .
 
-  rl < O : MaudeSE | state : 6, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), logic : LO, search-fold : B > processInput(O, 'show`sym-path`..Command)
-  => < O : MaudeSE | state : 35 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearchPath(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, unbounded, getNum(NT), LO, B))) .
+  rl < O : MaudeSE | state : 6, mi : MI, mn : MN, search-info : (NT, MT, T, T', T''), logic : LO, search-fold : B > processInput(O, 'show`smt-path`symbolic_.['bubble[PT]])
+  => < O : MaudeSE | state : 35 > reduceTerm(MI, O, 'MAUDE-SE-PRELUDE, upTerm(metaSmtSearchPath(upModule(MN, false), T, T', T'' = upTerm((true).Bool), '=>*, getNum(MT), getNum(PT), LO, B))) .
 
   rl < O : MaudeSE | state : 35, mi : MI, mn : MN > reducedTerm(O, MI, C, T, TY)
   => < O : MaudeSE | state : 2 > getLine(stdin, O, trace2str(upModule(MN, false), downTerm(T, (failure).Trace2Result?)) + "\n" + "MaudeSE> ") .

@@ -548,3 +548,53 @@ class YicesConverter(Converter):
             return term
         
         raise Exception(f"fail to apply dag2term to \"{t}\"")
+
+    def mkApp(self, op, args):
+        """make an application term
+
+        :param op: An operator
+        :param args: a list of arguments
+        :returns: A pair of an SMT solver term and its variables
+        """
+        o, ty = op
+        if ty == "list":
+            t = o(list(map(lambda x: x[0][0], args)))
+        else:
+            t = o(*map(lambda x: x[0][0], args))
+        return tuple([(t, Terms.type_of_term(t)), None, list()])
+    
+    def getSymbol(self, t: Term):
+        """returns a corresponding operator
+
+        :param t: A maude term
+        :returns: A corresponding operator
+        """
+        symbol = str(t.symbol())
+
+        sorts = [self._decl_sort(str(arg.symbol().getRangeSort())) for arg in t.arguments()]
+        sorts.append(self._decl_sort(str(t.symbol().getRangeSort())))
+        k = (symbol, tuple(sorts))
+
+        if k in self._symbol_map:
+            sym, th, name = self._symbol_map[k]
+
+            fun_key = (sym, symbol)
+            assert th == "euf"
+
+            # get function type and make a function term
+            if fun_key not in self._func_dict:
+                self._func_dict[fun_key] = Terms.new_uninterpreted_term(sym, symbol)
+
+            return self._func_dict[fun_key]
+
+        if symbol in self._op_dict:
+            op = self._op_dict[symbol]
+
+            # multinary
+            if symbol == "_and_" or symbol == "_or_":
+                ty = "list"
+            else:
+                ty = "tuple"
+            return tuple([op, ty])
+        
+        raise Exception(f"fail to get corresponding symbol of \"{t}\"")

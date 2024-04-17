@@ -13,6 +13,14 @@ class Converter:
     def term2dag(self, term):
         pass
 
+    @abc.abstractmethod
+    def mkApp(self, symbol, args):
+        pass
+
+    @abc.abstractmethod
+    def getSymbol(self, dag):
+        pass
+
 
 class Connector:
     @abc.abstractmethod

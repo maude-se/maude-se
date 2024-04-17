@@ -192,8 +192,57 @@ class Cvc5Converter(Converter):
     def _term2dag(self, term):
         # t, ty = term
 
-        # variable
         kind, sort = term.getKind(), term.getSort()
+        if kind == Kind.AND:
+            return " and ".join([self._term2dag(c) for c in term])
+        
+        if kind == Kind.OR:
+            return " or ".join([self._term2dag(c) for c in term])
+        
+        if kind == Kind.NOT:
+            return f"(not {self._term2dag(term[0])})"
+        
+        if kind == Kind.EQUAL:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"({l} === {r})"
+
+        if kind == Kind.GT:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"{l} > {r}"
+
+        if kind == Kind.GEQ:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"{l} >= {r}"
+
+        if kind == Kind.LT:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"{l} < {r}"
+
+        if kind == Kind.LEQ:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"{l} <= {r}"
+        
+        if kind == Kind.ADD:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"{l} + {r}"
+
+        if kind == Kind.SUB:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"{l} - {r}"
+
+        if kind == Kind.MULT:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+            return f"{l} * {r}"
+
+        if kind == Kind.DIVISION:
+            l, r = self._term2dag(term[0]), self._term2dag(term[1])
+
+            if sort.isInteger():
+                return f"{l} div {r}"
+            else:
+                return f"{l} / {r}"
+
+        # variable
         if kind == Kind.CONSTANT:
             # variable
             sort_table = {self._s.getIntegerSort()  : "Integer", 
@@ -334,3 +383,48 @@ class Cvc5Converter(Converter):
             return tuple([t, v_s])
         
         raise Exception(f"fail to apply dag2term to \"{t}\"")
+    
+    def mkApp(self, op, args):
+        """make an application term
+
+        :param op: An operator
+        :param args: a list of arguments
+        :returns: A pair of an SMT solver term and its variables
+        """
+        op_c, th = op
+
+        if th == "euf": 
+            f = self._s.mkTerm(Kind.APPLY_UF, op_c, *map(lambda x: x[0], args))
+            return tuple([f, None, list()])
+        else:
+            t = None
+            for op in op_c:
+                if t is None:
+                    t = self._s.mkTerm(op, *map(lambda x: x[0], args))
+                else:
+                    t = self._s.mkTerm(op, t)
+
+            return tuple([t, None, list()])
+
+    def getSymbol(self, t: Term):
+        """returns a corresponding operator
+
+        :param t: A maude term
+        :returns: A corresponding operator
+        """
+        if t.isVariable():
+            raise Exception("an input term cannot be a variable")
+
+        symbol = str(t.symbol())
+
+        sorts = [self._decl_sort(str(arg.symbol().getRangeSort())) for arg in t.arguments()]
+        sorts.append(self._decl_sort(str(t.symbol().getRangeSort())))
+        k = (symbol, tuple(sorts))
+
+        if k in self._symbol_map:
+            return self._symbol_map[k]
+
+        if symbol in self._op_dict:
+            return tuple([self._op_dict[symbol], "builtin"])
+        
+        raise Exception(f"fail to get corresponding symbol of \"{t}\"")

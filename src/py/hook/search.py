@@ -171,6 +171,8 @@ class SearchHook(Hook):
         return c_l            
 
     def run(self, term, data):
+        # import time
+        # s = time.time()
         # reduce arguments
         for arg in term.arguments():
             arg.reduce()
@@ -229,7 +231,9 @@ class SearchHook(Hook):
         is_merge = "true" in str(merge)
 
         self.conn.set_logic(str(logic).replace("'", ""))
+        # e = time.time()
 
+        # print("else : {:.3f}".format(e - s))
         for n, (sol, const, nrew, num, path) in enumerate(
             init_t.smtSearch2(
                 searchType,
@@ -242,6 +246,18 @@ class SearchHook(Hook):
                 max_depth,
             )
         ):
+            if self._is_path:
+                if sol_num == num:
+                    subst_t, _ = self._make_assn(symbol_mo)
+                    return self._get_symbol("traceResult").makeTerm(
+                        [
+                            self._make_trace(symbol_mo, module, path()),
+                            subst_t
+                        ]
+                    )
+                else:
+                    continue
+            
             cur_n = n + 1
 
             # already exceed
@@ -251,31 +267,21 @@ class SearchHook(Hook):
             if cur_n == sol_num:
 
                 subst_t, subst = self._make_assn(symbol_mo)
+                print("rewrites : ", nrew)
+                # print("  # state explored : " + str(num))
+                
+                (s_t,) = sol.arguments()
 
-                if self._is_path:
-                    return self._get_symbol("traceResult").makeTerm(
-                        [
-                            self._make_trace(symbol_mo, module, path()),
-                            subst_t
-                        ]
-                    )
+                ct = self.conv.term2dag(const)
 
-                else:
-                    # print(sol, " with ", nrew)
-                    # print("  # state explored : " + str(num))
-                    
-                    (s_t,) = sol.arguments()
-
-                    ct = self.conv.term2dag(const)
-
-                    return self._get_symbol("success").makeTerm(
-                        [
-                            symbol_mo.upTerm(s_t),
-                            subst_t,
-                            symbol_mo.upTerm(subst.instantiate(s_t)),
-                            symbol_mo.upTerm(ct),
-                            symbol_mo.parseTerm(f"({num}).Nat"),
-                        ]
-                    )
+                return self._get_symbol("success").makeTerm(
+                    [
+                        symbol_mo.upTerm(s_t),
+                        subst_t,
+                        symbol_mo.upTerm(subst.instantiate(s_t)),
+                        symbol_mo.upTerm(ct),
+                        symbol_mo.parseTerm(f"({num}).Nat"),
+                    ]
+                )
 
         return ff.makeTerm([])

@@ -369,3 +369,29 @@ class Z3Converter(Converter):
             return tuple([op(*map(lambda x: x[0], p_args)), reduce(lambda acc, cur: acc.union(cur[1]), p_args, set())])
         
         raise Exception(f"fail to apply dag2term to \"{t}\"")
+
+    def mkApp(self, op, args):
+        """make an application term
+
+        :param op: An operator
+        :param args: a list of arguments
+        :returns: A pair of an SMT solver term and its variables
+        """
+        return tuple([op(*map(lambda x: x[0], args)), None, list()])
+    
+    def getSymbol(self, t: Term):
+        """returns a corresponding operator
+
+        :param t: A maude term
+        :returns: A corresponding operator
+        """
+        if t.isVariable():
+            raise Exception("an input term cannot be a variable")
+
+        symbol = str(t.symbol())
+
+        if symbol in self._op_dict:
+            op = self._op_dict[symbol]
+            return op
+        
+        raise Exception(f"fail to get corresponding symbol of \"{t}\"")
