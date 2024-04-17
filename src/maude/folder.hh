@@ -15,8 +15,6 @@ public:
   Folder(bool fold);
   ~Folder();
 
-  typedef map<DagNode *, DagNode *> Mapping;
-
   bool insertState(int index, DagNode *state, int parentIndex, int *gIdx);
   void getState(int index, DagNode *&state) const;
 
