@@ -5,6 +5,7 @@
 #define _interface_h_
 
 #include "Python.h"
+#include <vector>
 
 // forward decl
 class EasyTerm;

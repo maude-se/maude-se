@@ -385,10 +385,10 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 						newState->dag = reprDag;
 						newState->depth = n->depth + 1;
 
-						stringstream pyId;
-						pyId << counter;
-						pyId << "-";
-						pyId << newState->constTermIndex;
+						// stringstream pyId;
+						// pyId << counter;
+						// pyId << "-";
+						// pyId << newState->constTermIndex;
 
 						// PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
 						SmtTerm* next = connector->add_const(acc, cur);

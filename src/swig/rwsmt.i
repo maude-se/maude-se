@@ -75,7 +75,7 @@ public:
 		/**
 		 * Get the number of rewrites until this term has been found.
 		 */
-		PyObject* getStateConst(int stateNr) {
+		SmtTerm* getStateConst(int stateNr) {
 			return $self->getStateConst(stateNr);
 		}
 	}

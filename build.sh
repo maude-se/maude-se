@@ -26,7 +26,7 @@ progress() { echo "===== " $@ ; }
 build_deps() {
   build_gmp
   build_libsigsegv
-  build_libncurses
+  # build_libncurses
   build_tecla
   build_libpoly
   build_buddy
@@ -117,16 +117,30 @@ build_maude_lib() {
   cd maude-bindings/subprojects/maudesmc
   (
     rm -rf release
-    arch -arm64 meson setup release --buildtype=custom -Dcpp_args="-fno-stack-protector -fstrict-aliasing" \
-          -Dextra-lib-dirs="$build_dir/lib" \
-          -Dextra-include-dirs="$build_dir/include" \
-          -Dstatic-libs='buddy, gmp, sigsegv, yices2' \
-          -Dwith-smt='yices2' \
-          -Dwith-ltsmin=disabled \
-          -Dwith-simaude=disabled \
-          -Dc_args='-mno-thumb' \
-          -Dc_link_args="-Wl,--export-dynamic" \
-          -Dcpp_link_args="-mmacosx-version-min=14.0 -Wl,-x -u ___gmpz_get_d -L"$build_dir"/lib -lgmp"
+
+    os=$(uname)
+    if [ "$os" == "Darwin"]; then
+      arch -arm64 meson setup release --buildtype=custom -Dcpp_args="-fno-stack-protector -fstrict-aliasing" \
+            -Dextra-lib-dirs="$build_dir/lib" \
+            -Dextra-include-dirs="$build_dir/include" \
+            -Dstatic-libs='buddy, gmp, sigsegv, yices2' \
+            -Dwith-smt='yices2' \
+            -Dwith-ltsmin=disabled \
+            -Dwith-simaude=disabled \
+            -Dc_args='-mno-thumb' \
+            -Dc_link_args="-Wl,--export-dynamic" \
+            -Dcpp_link_args="-mmacosx-version-min=14.0 -Wl,-x -u ___gmpz_get_d -L"$build_dir"/lib -lgmp"
+    else
+      meson setup release --buildtype=custom -Dcpp_args="-fno-stack-protector -fstrict-aliasing" \
+            -Dextra-lib-dirs="$build_dir/lib" \
+            -Dextra-include-dirs="$build_dir/include" \
+            -Dstatic-libs='buddy, gmp, sigsegv, yices2' \
+            -Dwith-smt='yices2' \
+            -Dwith-ltsmin=disabled \
+            -Dwith-simaude=disabled \
+            -Dc_args='-mno-thumb' \
+            -Dc_link_args="-Wl,--export-dynamic"
+    fi
     cd release && ninja
   )
 }
@@ -139,17 +153,19 @@ build_maude_se() {
   mkdir -p $maudesmc_dir/installdir/lib
 
   cp $maudesmc_dir/release/config.h $maudesmc_dir/build
-  cp $maudesmc_dir/release/libmaude.dylib $maudesmc_dir/installdir/lib
+  cp $maudesmc_dir/release/libmaude.so $maudesmc_dir/installdir/lib
 
+  cp "$src_dir/swig/rwsmt.i" "$swig_src_dir"
+  cp "$src_dir/swig/module.i" "$swig_src_dir"
   cp "$src_dir/swig/core.i"   "$swig_src_dir"
+  cp "$src_dir/swig/python.i" "$swig_src_dir/specific"
   cp "$src_dir/core/smt_wrapper.hh" "$top_dir/maude-bindings/src" 
 
   cd maude-bindings 
   (
-    rm -rf dist/ maude.egg-info/ _skbuild/ dist/
+    rm -rf dist/ maude.egg-info/ _skbuild/
     python setup.py bdist_wheel -DBUILD_LIBMAUDE=OFF \
-          -DEXTRA_INCLUDE_DIRS="$maudesmc_dir/.build/include" \
-          -DARCHFLAGS="-arch arm64"
+          -DEXTRA_INCLUDE_DIRS="$maudesmc_dir/.build/include"
   )
 
   cd ..
