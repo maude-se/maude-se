@@ -171,6 +171,7 @@ build_maude_se() {
 
   cd ..
   # rm -rf ./out
+  mkdir -p ./out
   cp -r ./maude-bindings/dist/* ./out
 }
 
