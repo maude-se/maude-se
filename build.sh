@@ -170,8 +170,8 @@ build_maude_se() {
   )
 
   cd ..
-  rm -rf ./out
-  cp -r ./maude-bindings/dist ./out
+  # rm -rf ./out
+  cp -r ./maude-bindings/dist/* ./out
 }
 
 # build gmp
