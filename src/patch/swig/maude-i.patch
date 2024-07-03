@@ -1,2 +1,4 @@
 236a237
 > %include rwsmt.i
+239a241
+> %include core.i

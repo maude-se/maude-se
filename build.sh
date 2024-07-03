@@ -119,7 +119,7 @@ build_maude_lib() {
     rm -rf release
 
     os=$(uname)
-    if [ "$os" == "Darwin"]; then
+    if [[ "$os" == "Darwin" ]]; then
       arch -arm64 meson setup release --buildtype=custom -Dcpp_args="-fno-stack-protector -fstrict-aliasing" \
             -Dextra-lib-dirs="$build_dir/lib" \
             -Dextra-include-dirs="$build_dir/include" \
@@ -154,6 +154,7 @@ build_maude_se() {
 
   cp $maudesmc_dir/release/config.h $maudesmc_dir/build
   cp $maudesmc_dir/release/libmaude.so $maudesmc_dir/installdir/lib
+  cp $maudesmc_dir/release/libmaude.dylib $maudesmc_dir/installdir/lib
 
   cp "$src_dir/swig/rwsmt.i" "$swig_src_dir"
   cp "$src_dir/swig/module.i" "$swig_src_dir"
