@@ -102,7 +102,7 @@ public:
 	 *
 	 * @return An SMT constraint
 	 */
-	PyObject* getStateConst(int stateNr);
+	SmtTerm* getStateConst(int stateNr);
 
 	%unprotectDestructor(RewriteSmtSequenceSearch);
 };

@@ -1,9 +1,8 @@
 from maudeSE.maude import *
-from ..interface import *
 
 
 class CheckHook(Hook):
-    def __init__(self, connector: Connector, converter: Converter):
+    def __init__(self, connector: PyConnector, converter: PyConverter):
         super().__init__()
         self.conn = connector
         self.conv = converter
@@ -52,8 +51,8 @@ class CheckHook(Hook):
                 # contain some unsupported symbols
                 # e.g., uninterpreted
                 # hack
-                d0, _, _ = d
-                md0, _, _ = md[d]
+                d0, _, _ = d.getData()
+                md0, _, _ = md[d].getData()
                 v = top_module.parseTerm(f"\"{d0}\"")
                 val = top_module.parseTerm(f"\"{md0}\"")
 
@@ -83,7 +82,7 @@ class CheckHook(Hook):
 
         try:
             self.conn.set_logic(str(logic).replace("'", ""))
-            r = self.conn.check_sat(term)
+            r = self.conn.check_sat([term])
             # print(self.solv.assertions())
 
             if r == True and is_gen == tt:

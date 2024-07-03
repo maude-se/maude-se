@@ -14,7 +14,7 @@
 #include "variableDagNode.hh"
 #include "SMT_EngineWrapper.hh"
 
-#include "Python.h"
+#include "smt_wrapper_interface.hh"
 #include <ctime>
 
 class SmtStateTransitionGraph
@@ -27,14 +27,15 @@ public:
 
   SmtStateTransitionGraph(RewritingContext *initial,
                           const SMT_Info &smtInfo, SMT_EngineWrapper *engine,
-                          FreshVariableGenerator *freshVariableGenerator, PyObject *connector, PyObject *converter, bool fold, bool merge,
+                          FreshVariableGenerator *freshVariableGenerator, Connector *connector, Converter *converter, 
+                          bool fold, bool merge,
                           const mpz_class &avoidVariableNumber = 0);
   ~SmtStateTransitionGraph();
 
   int getNrStates() const;
   int getNextState(int stateNr, int index);
   DagNode *getStateDag(int stateNr);
-  PyObject* getStateConst(int stateNr);
+  SmtTerm* getStateConst(int stateNr);
   int getStateDepth(int stateNr) const;
   const ArcMap &getStateFwdArcs(int stateNr) const;
   //
@@ -66,19 +67,19 @@ protected:
 
   struct ConstrainedTerm
   {
-    ConstrainedTerm(DagNode *dag, PyObject *constraint);
+    ConstrainedTerm(DagNode *dag, SmtTerm *constraint);
     ~ConstrainedTerm();
 
     DagNode *dag;
-    PyObject *constraint;
+    SmtTerm *constraint;
     // for matching
     VariableInfo variableInfo;
     Term *term;
     LhsAutomaton *matchingAutomaton;
     int nrMatchingVariables; // number of variables needed for matching; includes any abstraction variables
 
-    bool findMatching(DagNode *other, SmtStateTransitionGraph *pointer);
-    PyObject *subst;
+    bool findMatching(DagNode *other, Converter* converter, Connector *connector);
+    TermSubst *subst;
   };
 
   bool fold;
@@ -95,9 +96,6 @@ protected:
   const SMT_Info &smtInfo;         // information about SMT sort; might get folded into wrapper
   SMT_EngineWrapper *const engine; // wrapper to call the SMT engine
   FreshVariableGenerator *freshVariableGenerator;
-
-  PyObject *dag2maudeTerm(DagNode *dag);
-  DagNode *maudeTerm2dag(PyObject *term);
 
   State *initState;
   int counter;
@@ -120,8 +118,8 @@ protected:
   PyObject *maudeModule;
   PyObject *stateManager;
   PyObject *solver;
-  PyObject *termConverter;
-  PyObject *connector;
+  Converter *termConverter;
+  Connector *connector;
   PyObject *easySubst;
 
   // state manager
@@ -172,7 +170,7 @@ protected:
   double elseTime;
 
 protected:
-  PyObject *convDag2Term(DagNode *dag);
+  SmtTerm *convDag2Term(DagNode *dag);
 };
 
 inline SmtStateTransitionGraph::State::State(int hashConsIndex, int parent)
@@ -208,7 +206,7 @@ SmtStateTransitionGraph::getStateDag(int stateNr)
   return ct->dag;
 }
 
-inline PyObject *
+inline SmtTerm *
 SmtStateTransitionGraph::getStateConst(int stateNr)
 {
   // TODO: return const DAG
@@ -256,44 +254,20 @@ SmtStateTransitionGraph::getStateParent(int stateNr) const
   return seen[stateNr]->parent;
 }
 
-inline PyObject *SmtStateTransitionGraph::dag2maudeTerm(DagNode *dag)
-{
-  PyObject *capsuleObj = PyCapsule_New((void *)(dag), NULL, NULL);
-  PyObject *pyDag = PyObject_CallMethodObjArgs(maudeModule, dag2term, capsuleObj, NULL);
-  if (pyDag == nullptr)
-  {
-    IssueWarning("failed to call maude.dag2term");
-  }
-  return pyDag;
-}
-
-inline DagNode *SmtStateTransitionGraph::maudeTerm2dag(PyObject *term)
-{
-  PyObject *dagCapsuleObj = PyObject_CallMethodObjArgs(maudeModule, term2dag, term, NULL);
-  if (dagCapsuleObj == nullptr)
-  {
-    IssueWarning("failed to call maude.term2dag");
-  }
-  DagNode *dag = (DagNode *)(PyCapsule_GetPointer(dagCapsuleObj, NULL));
-  // Py_DECREF(dagCapsuleObj);
-  return dag;
-}
-
-inline PyObject *SmtStateTransitionGraph::convDag2Term(DagNode *dag)
+inline SmtTerm *SmtStateTransitionGraph::convDag2Term(DagNode *dag)
 {
   // call Python the dag2Term method of the Converter class
-  PyObject *maudeTerm = dag2maudeTerm(dag);
+  // PyObject *maudeTerm = dag2maudeTerm(dag);
   clock_t loop_s = clock();
-  PyObject *term = PyObject_CallMethodObjArgs(termConverter, dag2term, maudeTerm, NULL);
+  EasyTerm* ff = termConverter->convert(dag);
+  SmtTerm *term = termConverter->dag2term(ff);
   clock_t loop_e = clock();
   elseTime += (double)(loop_e - loop_s);
+
   if (term == nullptr)
   {
     IssueWarning("failed to call Converter's dag2term for " << dag);
   }
-  // remove a maude object
-  // Py_DECREF(maudeTerm);
-  Py_XINCREF(term);
   return term;
 }
 

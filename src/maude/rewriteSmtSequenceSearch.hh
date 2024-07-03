@@ -20,7 +20,7 @@ public:
                            const SMT_Info &smtInfo,
                            SMT_EngineWrapper *engine,
                            FreshVariableGenerator *freshVariableGenerator,
-                           PyObject *connector, PyObject *converter,
+                           Connector *connector, Converter *converter,
                            bool fold = true, bool merge = false,
                            int maxDepth = -1,
                            const mpz_class &avoidVariableNumber = 0);

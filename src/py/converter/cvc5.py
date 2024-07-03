@@ -1,4 +1,3 @@
-from ..interface import *
 from ..util import *
 from functools import reduce
 
@@ -8,10 +7,11 @@ import cvc5
 from cvc5 import Kind
 
 
-class Cvc5Converter(Converter):
+class Cvc5Converter(PyConverter):
     """A term converter from Maude to Yices"""
 
     def __init__(self):
+        PyConverter.__init__(self)
         self._s = cvc5.Solver()
         self._g = id_gen()
         self._symbol_info = dict()
@@ -186,7 +186,7 @@ class Cvc5Converter(Converter):
         return self._func_dict[key]
     
     def term2dag(self, term):
-        t, _, _ = term
+        t, _, _ = term.getData()
         return self._module.parseTerm(self._term2dag(t))
 
     def _term2dag(self, term):
@@ -275,7 +275,7 @@ class Cvc5Converter(Converter):
           an SMT solver term and its variables
         """
         term, v_set = self._dag2term(t)
-        return tuple([term, None, list(v_set)])
+        return SmtTerm([term, None, list(v_set)])
     
     def _dag2term(self, t: Term):
 

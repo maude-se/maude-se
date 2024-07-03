@@ -35,11 +35,12 @@
 #include "token.hh"
 // #include "Python.h"
 
-#include <sstream>
+// #include <sstream>
 
 SmtStateTransitionGraph::SmtStateTransitionGraph(RewritingContext *initial,
 												 const SMT_Info &smtInfo, SMT_EngineWrapper *engine,
-												 FreshVariableGenerator *freshVariableGenerator, PyObject *connector, PyObject *converter, bool fold, bool merge,
+												 FreshVariableGenerator *freshVariableGenerator, Connector *connector, Converter *converter,
+												 bool fold, bool merge,
 												 const mpz_class &avoidVariableNumber)
 	: initial(initial), smtInfo(smtInfo), engine(engine), fold(fold), merge(merge), connector(connector), termConverter(converter),
 	  freshVariableGenerator(freshVariableGenerator), stateCollection(fold)
@@ -48,51 +49,6 @@ SmtStateTransitionGraph::SmtStateTransitionGraph(RewritingContext *initial,
 		Verbose("folding option is on");
 	else
 		Verbose("folding option is off");
-
-	PyRun_SimpleString("import sys; import os");
-	PyRun_SimpleString("sys.path.append(\"{}/maudeSE\".format(os.getcwd()))");
-	PyRun_SimpleString("from maudeSE.util import *");
-
-	mainModule = PyImport_AddModule("__main__");
-	if (mainModule == nullptr)
-	{
-		IssueWarning("fail to load main python module");
-	}
-
-	maudeModule = PyImport_AddModule("maudeSE.maude");
-	if (maudeModule == nullptr)
-	{
-		IssueWarning("fail to load maude python module");
-	}
-
-	push = Py_BuildValue("s", "push");
-	check_sat = Py_BuildValue("s", "check_sat");
-	add = Py_BuildValue("s", "add");
-	pop = Py_BuildValue("s", "pop");
-
-	sat = Py_BuildValue("s", "sat");
-	unsat = Py_BuildValue("s", "unsat");
-
-	dag2term = Py_BuildValue("s", "dag2term");
-	term2dag = Py_BuildValue("s", "term2dag");
-
-	makeConjunct = Py_BuildValue("s", "makeConjunct");
-	makeEq = Py_BuildValue("s", "makeEq");
-	subsume = Py_BuildValue("s", "subsume");
-	mergeF = Py_BuildValue("s", "merge");
-
-	add2match = Py_BuildValue("s", "add2match");
-	clearMatch = Py_BuildValue("s", "clearMatch");
-
-	add_const = Py_BuildValue("s", "add_const");
-
-	make_assignment = Py_BuildValue("s", "make_assignment");
-
-	insert = Py_BuildValue("s", "insert");
-	instantiate = Py_BuildValue("s", "instantiate");
-
-	prefix1 = Py_BuildValue("s", "#");
-	prefix2 = Py_BuildValue("s", "!");
 
 	DagNode *trueDag = smtInfo.getTrueSymbol()->makeDagNode();
 	trueDag->computeTrueSort(*initial);
@@ -260,20 +216,30 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 			Verbose("first argument is " << c1 << " and second is " << c2);
 
 			// accumulated constraints
-			PyObject *acc = consTermSeen[n->hashConsIndex][n->constTermIndex]->constraint;
+			SmtTerm *acc = consTermSeen[n->hashConsIndex][n->constTermIndex]->constraint;
 			// we have pair of terms (norm, prev)
-			PyObject *cur = convDag2Term(c2);
+			SmtTerm *cur = convDag2Term(c2);
 
-			Py_XINCREF(acc);
+			// Py_XINCREF(acc);
 
-			PyObject *result = PyObject_CallMethodObjArgs(connector, check_sat, acc, cur, NULL);
-			if (result == nullptr)
-			{
-				IssueWarning("failed to check constraint");
-			}
+			// PyObject *result = PyObject_CallMethodObjArgs(connector, check_sat, acc, cur, NULL);
+			std::vector<SmtTerm*> ll;
+			ll.push_back(acc);
+			ll.push_back(cur);
 
-			if (PyObject_RichCompareBool(result, Py_True, Py_EQ) <= 0)
-			{
+			bool result = connector->check_sat(ll);
+
+			// if (result == nullptr)
+			// {
+			// 	IssueWarning("failed to check constraint");
+			// }
+
+			// if (PyObject_RichCompareBool(result, Py_True, Py_EQ) <= 0)
+			// {
+			// 	Verbose("constraint is unsatisfiable ... continue");
+			// 	continue;
+			// }
+			if (!result){
 				Verbose("constraint is unsatisfiable ... continue");
 				continue;
 			}
@@ -298,43 +264,44 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 					newState->dag = c1;
 					newState->depth = n->depth + 1;
 
-					PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
+					// PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
+					SmtTerm* next = connector->add_const(acc, cur);
 					if (next == nullptr)
 					{
 						IssueWarning("failed to make a constraint");
 					}
 
-					Py_XINCREF(next);
+					// Py_XINCREF(next);
 
-					PyObject *objectsRepresentation00 = PyObject_Repr(next);
-					const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
+					// PyObject *objectsRepresentation00 = PyObject_Repr(next);
+					// const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
 
-					PyObject *objectsRepresentation11 = PyObject_Repr(acc);
-					const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
+					// PyObject *objectsRepresentation11 = PyObject_Repr(acc);
+					// const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
 
-					PyObject *objectsRepresentation22 = PyObject_Repr(cur);
-					const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
+					// PyObject *objectsRepresentation22 = PyObject_Repr(cur);
+					// const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
 
-					Py_XDECREF(objectsRepresentation00);
-					Py_XDECREF(objectsRepresentation11);
-					Py_XDECREF(objectsRepresentation22);
+					// Py_XDECREF(objectsRepresentation00);
+					// Py_XDECREF(objectsRepresentation11);
+					// Py_XDECREF(objectsRepresentation22);
 
-					const void *address = static_cast<const void *>(newState->dag);
-					std::stringstream strs;
-					strs << address;
-					string adrId = strs.str();
+					// const void *address = static_cast<const void *>(newState->dag);
+					// std::stringstream strs;
+					// strs << address;
+					// string adrId = strs.str();
 
-					Verbose("  new State " << counter << " added");
-					Verbose("  dag : ");
-					Verbose("  " << newState->dag);
-					Verbose("  address : ");
-					Verbose("  " << adrId.c_str());
-					Verbose("  acc : ");
-					Verbose("  " << ss11);
-					Verbose("  cur : ");
-					Verbose("  " << ss22);
-					Verbose("  and : ");
-					Verbose("  " << ss00);
+					// Verbose("  new State " << counter << " added");
+					// Verbose("  dag : ");
+					// Verbose("  " << newState->dag);
+					// Verbose("  address : ");
+					// Verbose("  " << adrId.c_str());
+					// Verbose("  acc : ");
+					// Verbose("  " << ss11);
+					// Verbose("  cur : ");
+					// Verbose("  " << ss22);
+					// Verbose("  and : ");
+					// Verbose("  " << ss00);
 
 					ConstrainedTerm *t = new ConstrainedTerm(c1, next);
 					t->dag->mark();
@@ -369,7 +336,7 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 					{
 						Verbose("  check folding from " << c1 << " to " << constTerm->dag);
 						// check the conjunt dag is subsumed by an older one
-						bool isMatch = constTerm->findMatching(c1, this);
+						bool isMatch = constTerm->findMatching(c1, termConverter, connector);
 
 						if (!isMatch)
 						{
@@ -378,15 +345,23 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 						// must be true
 						// Assert(isMatch == true, "...");
 
-						PyObject *subsumedResult = PyObject_CallMethodObjArgs(connector, subsume, constTerm->subst, constTerm->constraint, acc, cur, NULL);
-						if (subsumedResult == nullptr)
-						{
-							IssueWarning("failed to apply subsumption");
-						}
+						// PyObject *subsumedResult = PyObject_CallMethodObjArgs(connector, subsume, constTerm->subst, constTerm->constraint, acc, cur, NULL);
+						bool subsumedResult = connector->subsume(constTerm->subst, constTerm->constraint, acc, cur);
+						// if (subsumedResult == nullptr)
+						// {
+						// 	IssueWarning("failed to apply subsumption");
+						// }
 
 						// subsumed by older one
-						if (PyObject_RichCompareBool(subsumedResult, Py_True, Py_EQ) > 0)
-						{
+						// if (PyObject_RichCompareBool(subsumedResult, Py_True, Py_EQ) > 0)
+						// {
+						// 	Verbose("constraints subsumed by another");
+						// 	nextState = map2seen[make_tuple(index2, cc)];
+						// 	exists = true;
+						// 	needMerge = false;
+						// 	break;
+						// }
+						if (subsumedResult){
 							Verbose("constraints subsumed by another");
 							nextState = map2seen[make_tuple(index2, cc)];
 							exists = true;
@@ -415,36 +390,37 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 						pyId << "-";
 						pyId << newState->constTermIndex;
 
-						PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
+						// PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
+						SmtTerm* next = connector->add_const(acc, cur);
 						if (next == nullptr)
 						{
 							IssueWarning("failed to make a constraint");
 						}
 
-						Py_XINCREF(next);
+						// Py_XINCREF(next);
 
-						PyObject *objectsRepresentation00 = PyObject_Repr(next);
-						const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
+						// PyObject *objectsRepresentation00 = PyObject_Repr(next);
+						// const char *ss00 = PyUnicode_AsUTF8(objectsRepresentation00);
 
-						PyObject *objectsRepresentation11 = PyObject_Repr(acc);
-						const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
+						// PyObject *objectsRepresentation11 = PyObject_Repr(acc);
+						// const char *ss11 = PyUnicode_AsUTF8(objectsRepresentation11);
 
-						PyObject *objectsRepresentation22 = PyObject_Repr(cur);
-						const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
+						// PyObject *objectsRepresentation22 = PyObject_Repr(cur);
+						// const char *ss22 = PyUnicode_AsUTF8(objectsRepresentation22);
 
-						Py_XDECREF(objectsRepresentation00);
-						Py_XDECREF(objectsRepresentation11);
-						Py_XDECREF(objectsRepresentation22);
+						// Py_XDECREF(objectsRepresentation00);
+						// Py_XDECREF(objectsRepresentation11);
+						// Py_XDECREF(objectsRepresentation22);
 
-						Verbose("  new State " << counter << " added");
-						Verbose("  dag : ");
-						Verbose("  " << newState->dag);
-						Verbose("  acc : ");
-						Verbose("  " << ss11);
-						Verbose("  cur : ");
-						Verbose("  " << ss22);
-						Verbose("  and : ");
-						Verbose("  " << ss00);
+						// Verbose("  new State " << counter << " added");
+						// Verbose("  dag : ");
+						// Verbose("  " << newState->dag);
+						// Verbose("  acc : ");
+						// Verbose("  " << ss11);
+						// Verbose("  cur : ");
+						// Verbose("  " << ss22);
+						// Verbose("  and : ");
+						// Verbose("  " << ss00);
 
 						ConstrainedTerm *t = new ConstrainedTerm(c1, next);
 						t->dag->mark();
@@ -463,124 +439,124 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 
 			if (merge && needMerge)
 			{
-				bool foundMergable = false;
-				// make a dummy constrained term for matching
-				ConstrainedTerm *t = new ConstrainedTerm(c1, nullptr);
+				// bool foundMergable = false;
+				// // make a dummy constrained term for matching
+				// ConstrainedTerm *t = new ConstrainedTerm(c1, nullptr);
 
-				// find mergable state
-				PyObject *newConstTerm = nullptr;
-				PyObject *prevPyDag = nullptr;
-				PyObject *curPyDag = nullptr;
+				// // find mergable state
+				// PyObject *newConstTerm = nullptr;
+				// PyObject *prevPyDag = nullptr;
+				// PyObject *curPyDag = nullptr;
 
-				int foundStateIndex = NONE;
-				int foundConstIndex = 0;
-				for (State *constTermState : seen)
-				{
-					foundStateIndex++;
+				// int foundStateIndex = NONE;
+				// int foundConstIndex = 0;
+				// for (State *constTermState : seen)
+				// {
+				// 	foundStateIndex++;
 
-					// only apply for the states with the same depth
-					if (constTermState->depth != n->depth + 1)
-					{
-						continue;
-					}
+				// 	// only apply for the states with the same depth
+				// 	if (constTermState->depth != n->depth + 1)
+				// 	{
+				// 		continue;
+				// 	}
 
-					int ctIdx = 0;
-					for (auto constTerm : consTermSeen[constTermState->hashConsIndex])
-					{
-						bool isMatch = t->findMatching(constTerm->dag, this);
-						Verbose("  check matching for merging from ");
-						Verbose("  " << t->dag);
-						Verbose("  " << constTerm->dag);
-						Verbose("  result : " << isMatch);
+				// 	int ctIdx = 0;
+				// 	for (auto constTerm : consTermSeen[constTermState->hashConsIndex])
+				// 	{
+				// 		bool isMatch = t->findMatching(constTerm->dag, termConverter, connector);
+				// 		Verbose("  check matching for merging from ");
+				// 		Verbose("  " << t->dag);
+				// 		Verbose("  " << constTerm->dag);
+				// 		Verbose("  result : " << isMatch);
 
-						if (isMatch)
-						{
-							Verbose("inside merge: " << c1 << " matches " << constTerm->dag);
+				// 		if (isMatch)
+				// 		{
+				// 			Verbose("inside merge: " << c1 << " matches " << constTerm->dag);
 
-							prevPyDag = dag2maudeTerm(constTerm->dag);
-							curPyDag = dag2maudeTerm(t->dag);
+				// 			prevPyDag = dag2maudeTerm(constTerm->dag);
+				// 			curPyDag = dag2maudeTerm(t->dag);
 
-							newConstTerm = PyObject_CallMethodObjArgs(connector, mergeF, t->subst, prevPyDag, constTerm->constraint, curPyDag, acc, cur, NULL);
-							if (newConstTerm == nullptr)
-							{
-								IssueWarning("failed to apply merging");
-							}
+				// 			newConstTerm = PyObject_CallMethodObjArgs(connector, mergeF, t->subst, prevPyDag, constTerm->constraint, curPyDag, acc, cur, NULL);
+				// 			if (newConstTerm == nullptr)
+				// 			{
+				// 				IssueWarning("failed to apply merging");
+				// 			}
 
-							foundMergable = true;
-							foundConstIndex = ctIdx;
-							// cout << " found " << endl;
-							break;
-						}
-						ctIdx++;
-					}
+				// 			foundMergable = true;
+				// 			foundConstIndex = ctIdx;
+				// 			// cout << " found " << endl;
+				// 			break;
+				// 		}
+				// 		ctIdx++;
+				// 	}
 
-					// find mergable state
-					if (foundMergable)
-						break;
-				}
+				// 	// find mergable state
+				// 	if (foundMergable)
+				// 		break;
+				// }
 
-				if (foundMergable)
-				{
-					State *foundState = seen[foundStateIndex];
+				// if (foundMergable)
+				// {
+				// 	State *foundState = seen[foundStateIndex];
 
-					// 1) the constraint after merging must be given
-					// 2) assertion, mergable states must not be explored yet
-					// 3) its depth is the same as the merged state
-					if (newConstTerm == nullptr || foundState->rewriteState != 0 ||
-						foundState->depth != n->depth + 1)
-					{
-						IssueWarning("invalid state is used to merging");
-					}
+				// 	// 1) the constraint after merging must be given
+				// 	// 2) assertion, mergable states must not be explored yet
+				// 	// 3) its depth is the same as the merged state
+				// 	if (newConstTerm == nullptr || foundState->rewriteState != 0 ||
+				// 		foundState->depth != n->depth + 1)
+				// 	{
+				// 		IssueWarning("invalid state is used to merging");
+				// 	}
 
-					// get term
-					PyObject *term = PyTuple_GetItem(newConstTerm, 0);
-					PyObject *newConst = PyTuple_GetItem(newConstTerm, 1);
+				// 	// get term
+				// 	PyObject *term = PyTuple_GetItem(newConstTerm, 0);
+				// 	PyObject *newConst = PyTuple_GetItem(newConstTerm, 1);
 
-					if (term == nullptr || newConst == nullptr)
-					{
-						IssueWarning("failed to retreive a constrained term");
-					}
+				// 	if (term == nullptr || newConst == nullptr)
+				// 	{
+				// 		IssueWarning("failed to retreive a constrained term");
+				// 	}
 
-					// get dag
-					DagNode *mergableDag = maudeTerm2dag(term);
+				// 	// get dag
+				// 	DagNode *mergableDag = maudeTerm2dag(term);
 
-					// need to compute sort
-					// otherwise, matching would fail
-					RewritingContext *sort_context = initial->makeSubcontext(mergableDag);
-					mergableDag->computeTrueSort(*sort_context);
-					delete sort_context;
+				// 	// need to compute sort
+				// 	// otherwise, matching would fail
+				// 	RewritingContext *sort_context = initial->makeSubcontext(mergableDag);
+				// 	mergableDag->computeTrueSort(*sort_context);
+				// 	delete sort_context;
 
-					ConstrainedTerm *constTerm = consTermSeen[foundState->hashConsIndex][foundConstIndex];
-					delete constTerm;
+				// 	ConstrainedTerm *constTerm = consTermSeen[foundState->hashConsIndex][foundConstIndex];
+				// 	delete constTerm;
 
-					consTermSeen[foundState->hashConsIndex][foundConstIndex] = new ConstrainedTerm(mergableDag, newConst);
+				// 	consTermSeen[foundState->hashConsIndex][foundConstIndex] = new ConstrainedTerm(mergableDag, newConst);
 
-					nextState = foundStateIndex;
-					delete t;
-				}
-				else
-				{
-					nextState = seen.size();
+				// 	nextState = foundStateIndex;
+				// 	delete t;
+				// }
+				// else
+				// {
+				// 	nextState = seen.size();
 
-					State *newState = new State(counter, stateNr);
-					newState->avoidVariableNumber = n->rewriteState->getMaxVariableNumber();
-					newState->dag = reprDag;
-					newState->depth = n->depth + 1;
+				// 	State *newState = new State(counter, stateNr);
+				// 	newState->avoidVariableNumber = n->rewriteState->getMaxVariableNumber();
+				// 	newState->dag = reprDag;
+				// 	newState->depth = n->depth + 1;
 
-					t->constraint = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
-					if (t->constraint == nullptr)
-					{
-						IssueWarning("failed to make a constraint");
-					}
+				// 	t->constraint = PyObject_CallMethodObjArgs(connector, add_const, acc, cur, NULL);
+				// 	if (t->constraint == nullptr)
+				// 	{
+				// 		IssueWarning("failed to make a constraint");
+				// 	}
 
-					newState->constTermIndex = 0;
-					consTermSeen.insert(ConstrainedTermMap::value_type(counter, Vector<ConstrainedTerm *>()));
-					consTermSeen[counter].append(t);
-					map2seen.insert(Map2Seen::value_type(make_tuple(counter, 0), seen.size()));
-					seen.append(newState);
+				// 	newState->constTermIndex = 0;
+				// 	consTermSeen.insert(ConstrainedTermMap::value_type(counter, Vector<ConstrainedTerm *>()));
+				// 	consTermSeen[counter].append(t);
+				// 	map2seen.insert(Map2Seen::value_type(make_tuple(counter, 0), seen.size()));
+				// 	seen.append(newState);
 
-					counter++;
-				}
+				// 	counter++;
+				// }
 			}
 
 			n->nextStates.append(nextState);
@@ -614,29 +590,29 @@ int SmtStateTransitionGraph::getNextState(int stateNr, int index)
 
 void SmtStateTransitionGraph::printStateConst(int depth)
 {
-	for (auto state : seen)
-	{
-		if (state->depth == depth)
-		{
-			cout << "    state : " << state->dag << endl;
-			int cc = 0;
-			for (auto it : consTermSeen[state->hashConsIndex])
-			{
-				PyObject *str = PyObject_Repr(it->constraint);
-				const char *str_c = PyUnicode_AsUTF8(str);
-				Py_XDECREF(str);
+	// for (auto state : seen)
+	// {
+	// 	if (state->depth == depth)
+	// 	{
+	// 		cout << "    state : " << state->dag << endl;
+	// 		int cc = 0;
+	// 		for (auto it : consTermSeen[state->hashConsIndex])
+	// 		{
+	// 			PyObject *str = PyObject_Repr(it->constraint);
+	// 			const char *str_c = PyUnicode_AsUTF8(str);
+	// 			Py_XDECREF(str);
 
-				cout << "      dag   [" << cc + 1 << "]" << it->dag << endl;
-				cout << "      const [" << cc + 1 << "]" << str_c << endl;
-				cout << endl;
+	// 			cout << "      dag   [" << cc + 1 << "]" << it->dag << endl;
+	// 			cout << "      const [" << cc + 1 << "]" << str_c << endl;
+	// 			cout << endl;
 
-				cc++;
-			}
-		}
-	}
+	// 			cc++;
+	// 		}
+	// 	}
+	// }
 }
 
-SmtStateTransitionGraph::ConstrainedTerm::ConstrainedTerm(DagNode *dag, PyObject *constraint)
+SmtStateTransitionGraph::ConstrainedTerm::ConstrainedTerm(DagNode *dag, SmtTerm *constraint)
 	: dag(dag), constraint(constraint)
 {
 	Term *t = dag->symbol()->termify(dag);
@@ -667,7 +643,7 @@ SmtStateTransitionGraph::ConstrainedTerm::~ConstrainedTerm()
 		term->deepSelfDestruct();
 }
 
-bool SmtStateTransitionGraph::ConstrainedTerm::findMatching(DagNode *other, SmtStateTransitionGraph *pointer)
+bool SmtStateTransitionGraph::ConstrainedTerm::findMatching(DagNode *other, Converter* converter, Connector *connector)
 {
 	MemoryCell::okToCollectGarbage(); // otherwise we have huge accumulation of junk from matching
 	// DO NOT: this will cause memory corruption
@@ -687,10 +663,10 @@ bool SmtStateTransitionGraph::ConstrainedTerm::findMatching(DagNode *other, SmtS
 				  (subproblem == 0 || subproblem->solve(true, matcher));
 	delete subproblem;
 
-	subst = PyDict_New();
 	if (result)
 	{
 		int maxSize = matcher.nrFragileBindings();
+		std::vector<EasyTerm*> vars, vals;
 		for (int i = 0; i < maxSize; i++)
 		{
 			Term *v_term = variableInfo.index2Variable(i);
@@ -701,11 +677,11 @@ bool SmtStateTransitionGraph::ConstrainedTerm::findMatching(DagNode *other, SmtS
 			left->mark();
 			right->mark();
 
-			PyObject *var = pointer->dag2maudeTerm(left);
-			PyObject *val = pointer->dag2maudeTerm(right);
-
-			PyDict_SetItem(subst, var, val);
+			vars.push_back(converter->convert(left));
+			vals.push_back(converter->convert(right));
 		}
+
+		subst = connector->mkSubst(vars, vals);
 	}
 	return result;
 }

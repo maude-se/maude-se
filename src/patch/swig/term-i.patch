@@ -5,6 +5,6 @@
 207a210,214
 > 
 > 	RewriteSmtSequenceSearch* smtSearch2(SearchType type,
-> 			EasyTerm* target, PyObject* connector, PyObject* converter, bool fold = true, bool merge = false,
+> 			EasyTerm* target, Connector* connector, Converter* converter, bool fold = true, bool merge = false,
 > 			const Vector<ConditionFragment*> &condition = NO_CONDITION,
 > 			int depth = -1);

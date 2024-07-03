@@ -130,16 +130,22 @@ staticLibs = get_option('static-libs')
 libraries = []
 
 # GNU multiprecision library (https://gmplib.org/)
-
-gmpxx = cxx.find_library('gmpxx',
+gmpxx = dependency('gmpxx',
 		static: 'gmp' in staticLibs,
-		dirs: extraSearchPaths)
+		required: false)
 
-gmp = cxx.find_library('gmp',
-		static: 'gmp' in staticLibs,
-		dirs: extraSearchPaths)
+if not gmpxx.found()
+	# Versions before 6.2.0 do not include a pkg-config file
 
-libraries += [gmp, gmpxx]
+	gmpxx = cxx.find_library('gmpxx',
+			static: 'gmp' in staticLibs,
+			dirs: extraSearchPaths)
+	gmp = cxx.find_library('gmp',
+			static: 'gmp' in staticLibs,
+			dirs: extraSearchPaths)
+
+	libraries += [gmp]
+endif
 
 
 # GNU readline (https://tiswww.case.edu/php/chet/readline/rltop.html)
@@ -158,11 +164,7 @@ sigsegv = cxx.find_library('sigsegv',
 		required: get_option('with-sigsegv'),
 		dirs: extraSearchPaths)
 
-python = cxx.find_library('python3.8',
-			static: 'python3.8' in staticLibs,
-			dirs: extraSearchPaths)
-
-libraries += [buddy, gmpxx, sigsegv, python]
+libraries += [buddy, gmpxx, sigsegv]
 
 if readline.found()
 	conf.set('USE_READLINE', 1, description: 'use GNU readline command line editing library')

@@ -74,6 +74,7 @@ build_src() {
   maude_src_dir="$top_dir/maude-bindings/subprojects/maudesmc/src"
   swig_src_dir="$top_dir/maude-bindings/swig"
   
+  cp "$src_dir/core/smt_wrapper_interface.hh" "$maude_src_dir/SMT"
   cp "$src_dir/maude/folder.cc" "$maude_src_dir/SMT"
   cp "$src_dir/maude/folder.hh" "$maude_src_dir/SMT"
   cp "$src_dir/maude/rewriteSmtSearchState.cc" "$maude_src_dir/SMT"
@@ -85,12 +86,70 @@ build_src() {
   cp "$src_dir/maude/rewriteSmtSearch.cc" "$maude_src_dir/Mixfix"
   cp "$src_dir/swig/rwsmt.i" "$swig_src_dir"
   cp "$src_dir/swig/module.i" "$swig_src_dir"
+  cp "$src_dir/swig/core.i"   "$swig_src_dir"
   cp "$src_dir/swig/python.i" "$swig_src_dir/specific"
 
   cd maude-bindings 
   (
-    rm -rf dist/ maude.egg-info/ _skbuild/
-    python setup.py bdist_wheel
+    rm -rf dist/ maude.egg-info/ _skbuild/ dist/
+    python setup.py bdist_wheel -DBUILD_LIBMAUDE=OFF
+  )
+
+  cd ..
+  rm -rf ./out
+  cp -r ./maude-bindings/dist ./out
+}
+
+build_maude_lib() {
+  maude_src_dir="$top_dir/maude-bindings/subprojects/maudesmc/src"
+
+  cp "$src_dir/core/smt_wrapper_interface.hh" "$maude_src_dir/SMT" 
+  cp "$src_dir/maude/folder.cc" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/folder.hh" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/rewriteSmtSearchState.cc" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/rewriteSmtSearchState.hh" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/rewriteSmtSequenceSearch.cc" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/rewriteSmtSequenceSearch.hh" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/smtStateTransitionGraph.cc" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/smtStateTransitionGraph.hh" "$maude_src_dir/SMT"
+  cp "$src_dir/maude/rewriteSmtSearch.cc" "$maude_src_dir/Mixfix"
+
+  cd maude-bindings/subprojects/maudesmc
+  (
+    rm -rf release
+    arch -arm64 meson setup release --buildtype=custom -Dcpp_args="-fno-stack-protector -fstrict-aliasing" \
+          -Dextra-lib-dirs="$build_dir/lib" \
+          -Dextra-include-dirs="$build_dir/include" \
+          -Dstatic-libs='buddy, gmp, sigsegv, yices2' \
+          -Dwith-smt='yices2' \
+          -Dwith-ltsmin=disabled \
+          -Dwith-simaude=disabled \
+          -Dc_args='-mno-thumb' \
+          -Dc_link_args="-Wl,--export-dynamic" \
+          -Dcpp_link_args="-mmacosx-version-min=14.0 -Wl,-x -u ___gmpz_get_d -L"$build_dir"/lib -lgmp"
+    cd release && ninja
+  )
+}
+
+build_maude_se() {
+  maudesmc_dir="$top_dir/maude-bindings/subprojects/maudesmc"
+  swig_src_dir="$top_dir/maude-bindings/swig"
+
+  mkdir -p $maudesmc_dir/build
+  mkdir -p $maudesmc_dir/installdir/lib
+
+  cp $maudesmc_dir/release/config.h $maudesmc_dir/build
+  cp $maudesmc_dir/release/libmaude.dylib $maudesmc_dir/installdir/lib
+
+  cp "$src_dir/swig/core.i"   "$swig_src_dir"
+  cp "$src_dir/core/smt_wrapper.hh" "$top_dir/maude-bindings/src" 
+
+  cd maude-bindings 
+  (
+    rm -rf dist/ maude.egg-info/ _skbuild/ dist/
+    python setup.py bdist_wheel -DBUILD_LIBMAUDE=OFF \
+          -DEXTRA_INCLUDE_DIRS="$maudesmc_dir/.build/include" \
+          -DARCHFLAGS="-arch arm64"
   )
 
   cd ..
@@ -149,7 +208,7 @@ build_buddy() {
     rm -rf "$buddy_dir.tar.gz"
 
     cd "$buddy_dir"
-    ./configure CFLAGS="-fPIC" CXXFLAGS="-fPIC" --includedir="$include_dir" --libdir="$lib_dir" --disable-shared --enable-static
+    ./configure CFLAGS="-fPIC" CXXFLAGS="-fPIC" --includedir="$include_dir" --libdir="$lib_dir" --disable-shared
     
     make -j4
     make install
@@ -257,12 +316,12 @@ get_gnu() {
   rm -rf "$third_party/$libname.$ext"
 }
 
-build_maude_se() {
-  prepare
-  build_deps
-  patch_src
-  build_src
-}
+# Follow the below steps
+#  1. prepare
+#  2. build_deps
+#  3. patch_src
+#  4. build_maude_lib
+#  5. build_maude_se
 
 # Main
 # ----
@@ -272,8 +331,8 @@ case "$build_command" in
     prep)               prepare                   "$@" ;;
     deps)               build_deps                "$@" ;;
     patch)              patch_src                 "$@" ;;
-    compile)            build_src                 "$@" ;;
-    maude-se)           build_maude_se            "$@" ;;
+    build-maude)        build_maude_lib           "$@" ;;
+    build-maude-se)     build_maude_se            "$@" ;;
     *)      echo "
     usage: $0 [prep|deps|patch|build]
            $0 script <options>

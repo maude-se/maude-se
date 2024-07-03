@@ -2,11 +2,11 @@ import z3
 import time
 
 from ..maude import *
-from ..interface import *
 from ..util import id_gen
+from maudeSE.maude import PyConverter, PyConnector, SmtTerm, TermSubst
 
-class Z3Connector(Connector):
-    def __init__(self, converter: Converter, logic=None):
+class Z3Connector(PyConnector):
+    def __init__(self, converter: PyConverter, logic=None):
         super().__init__()
         self._c = converter
         self._g = id_gen()
@@ -23,11 +23,11 @@ class Z3Connector(Connector):
         self._s = z3.SolverFor(_logic)
         self._m = None
     
-    def check_sat(self, *consts):
+    def check_sat(self, consts):
         self._s.push()
 
         for const in consts:
-            c, _, _ = const
+            c, _, _ = const.getData()
             self._s.add(c)
 
         r = self._s.check()
@@ -47,33 +47,34 @@ class Z3Connector(Connector):
     def add_const(self, acc, cur):
         # initial case
         if acc is None:
-            (cur_t, _, cur_v) = cur
+            (cur_t, _, cur_v) = cur.getData()
             body = cur_t
 
         else:
-            (acc_f, _, acc_v), (cur_t, _, cur_v) = acc, cur
+            (acc_f, _, acc_v), (cur_t, _, cur_v) = acc.getData(), cur.getData()
             body = z3.And(acc_f, cur_t)
 
-        return tuple([z3.simplify(body), None, None])
+        return SmtTerm([z3.simplify(body), None, None])
 
     def subsume(self, subst, prev, acc, cur):
         s = time.time()
         
         d_s = time.time()
         t_l = list()
-        for p in subst:
-            src, _, _ = self._c.dag2term(p)
-            trg, _, _ = self._c.dag2term(subst[p])
+        sub = subst.getSubst()
+        for p in sub:
+            src, _, _ = self._c.dag2term(p).getData()
+            trg, _, _ = self._c.dag2term(sub[p]).getData()
 
             t_l.append((src, trg))
         d_e = time.time()
 
         self._dt += d_e - d_s
 
-        prev_c, _, _ = prev
+        prev_c, _, _ = prev.getData()
 
-        acc_c, _, _ = acc
-        cur_c, _, _ = cur 
+        acc_c, _, _ = acc.getData()
+        cur_c, _, _ = cur.getData()
     
         so_s = time.time()
         self._s.push()
@@ -133,11 +134,17 @@ class Z3Connector(Connector):
         new_prev = n_subst.instantiate(prev_t)
 
         return tuple([new_prev, tuple([z3.simplify(c), None, None])])
+    
+    def mkSubst(self, vars, vals):
+        subst = dict()
+        for v, val in zip(vars, vals):
+            subst[v] = val
+        return TermSubst(subst)
 
     def get_model(self):
         model_dict = dict()
         for d in self._m.decls():
-            model_dict[(d, None, None)] = (self._m[d], None, None)
+            model_dict[SmtTerm([d, None, None])] = SmtTerm([self._m[d], None, None])
 
         return model_dict
     

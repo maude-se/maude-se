@@ -1,6 +1,5 @@
 import ctypes
 
-from ..interface import *
 from ..util import *
 from functools import reduce
 
@@ -9,10 +8,11 @@ from yices import *
 from yices_api import *
 
 
-class YicesConverter(Converter):
+class YicesConverter(PyConverter):
     """A term converter from Maude to Yices"""
 
     def __init__(self):
+        PyConverter.__init__(self)
         self._g = id_gen()
         self._symbol_info = dict()
         self._symbol_map = dict()
@@ -187,7 +187,7 @@ class YicesConverter(Converter):
         return self._func_dict[key]
     
     def term2dag(self, term):
-        t, _, _ = term
+        t, _, _ = term.getData()
         return self._module.parseTerm(self._term2dag(t))
 
     def _term2dag(self, term):
@@ -419,7 +419,7 @@ class YicesConverter(Converter):
           an SMT solver term and its variables
         """
         term, v_set = self._dag2term(t)
-        return tuple([(term, Terms.type_of_term(term)), None, list(v_set)])
+        return SmtTerm([(term, Terms.type_of_term(term)), None, list(v_set)])
     
     def _dag2term(self, t: Term):
         if t in self._dag2term_memoize:

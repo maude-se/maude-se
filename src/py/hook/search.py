@@ -1,9 +1,8 @@
 from ..maude import *
-from ..interface import *
-
+from maudeSE.maude import PyConnector, PyConverter
 
 class SearchHook(Hook):
-    def __init__(self, connector: Connector, converter: Converter, path: bool):
+    def __init__(self, connector: PyConnector, converter: PyConverter, path: bool):
         super().__init__()
         self.conn = connector
         self.conv = converter

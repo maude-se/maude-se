@@ -7,5 +7,5 @@ option('extra-include-dirs', type: 'array', value: [], description: 'additional 
 option('extra-lib-dirs', type: 'array', value: [], description: 'additional directories where to look for libraries')
 option('with-ltsmin', type: 'feature', value: 'enabled', description: 'build a language module for LTSmin')
 option('with-simaude', type: 'feature', value: 'enabled', description: 'build the statistical simulator tool')
-option('static-libs', type: 'array', value: ['buddy', 'gmp', 'readline', 'sigsegv', 'yices2', 'cvc4', 'popt'], choices: ['buddy', 'gmp', 'readline', 'sigsegv', 'yices2', 'cvc4', 'popt'],
+option('static-libs', type: 'array', value: [], choices: ['buddy', 'gmp', 'readline', 'sigsegv', 'yices2', 'cvc4', 'popt', 'python3.8'],
        description: 'libraries to be linked statically')

@@ -36,7 +36,7 @@ RewriteSmtSequenceSearch::RewriteSmtSequenceSearch(RewritingContext *initial,
                                                    const SMT_Info &smtInfo,
                                                    SMT_EngineWrapper *engine,
                                                    FreshVariableGenerator *freshVariableGenerator,
-                                                   PyObject *connector, PyObject *converter,
+                                                   Connector *connector, Converter *converter,
                                                    bool fold, bool merge,
                                                    int maxDepth,
                                                    const mpz_class &avoidVariableNumber)
@@ -49,15 +49,16 @@ RewriteSmtSequenceSearch::RewriteSmtSequenceSearch(RewritingContext *initial,
   initState->constTermIndex = consTermSeen[initState->hashConsIndex].size();
   DagNode *initConst = makeConstraintFromCondition(goal->getCondition());
 
-  PyObject *initRi = convDag2Term(initConst);
+  SmtTerm *initRi = convDag2Term(initConst);
 
-  PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, Py_None, initRi, NULL);
+  // PyObject *next = PyObject_CallMethodObjArgs(connector, add_const, Py_None, initRi, NULL);
+  SmtTerm* next = connector->add_const(nullptr, initRi);
   if (next == nullptr)
   {
     IssueWarning("failed to make a constraint22");
   }
 
-  Py_XINCREF(next);
+  // Py_XINCREF(next);
   ConstrainedTerm *t = new ConstrainedTerm(initial->root(), next);
 
   consTermSeen.insert(ConstrainedTermMap::value_type(initState->hashConsIndex, Vector<ConstrainedTerm *>()));
@@ -332,29 +333,40 @@ bool RewriteSmtSequenceSearch::checkMatchConstraint(int stateNr)
   if (matchConstraint != 0)
   {
     Verbose("matchConstraint: " << matchConstraint);
-    PyObject* matchTerm = convDag2Term(matchConstraint);
+    SmtTerm* matchTerm = convDag2Term(matchConstraint);
     ConstrainedTerm *constrained = consTermSeen[seen[stateNr]->hashConsIndex][seen[stateNr]->constTermIndex];
-    PyObject *pyConst = constrained->constraint;
+    SmtTerm *pyConst = constrained->constraint;
 
-    Py_XINCREF(pyConst);
+    // Py_XINCREF(pyConst);
 
-    PyObject *check_sat_r = PyObject_CallMethodObjArgs(connector, check_sat, pyConst, matchTerm, NULL);
-    if (check_sat_r != nullptr)
-    {
-      if (PyObject_RichCompareBool(check_sat_r, Py_True, Py_EQ) <= 0)
+    // PyObject *check_sat_r = PyObject_CallMethodObjArgs(connector, check_sat, pyConst, matchTerm, NULL);
+    std::vector<SmtTerm*> ll;
+    ll.push_back(pyConst);
+    ll.push_back(matchTerm);
+
+    bool check_sat_r = connector->check_sat(ll);
+
+    // if (check_sat_r != nullptr)
+    // {
+      // if (PyObject_RichCompareBool(check_sat_r, Py_True, Py_EQ) <= 0)
+      // {
+      //   return false;
+      // }
+      if (!check_sat_r)
       {
         return false;
-      } 
+      }
       else 
       {
-          constrained->constraint = PyObject_CallMethodObjArgs(connector, add_const, constrained->constraint, matchTerm, NULL);
-          Py_XINCREF(constrained->constraint);
+          constrained->constraint = connector->add_const(constrained->constraint, matchTerm);
+          // constrained->constraint = PyObject_CallMethodObjArgs(connector, add_const, constrained->constraint, matchTerm, NULL);
+          // Py_XINCREF(constrained->constraint);
       }
-    }
-    else
-    {
-      IssueWarning("fail to checkSat");
-    }
+    // }
+    // else
+    // {
+      // IssueWarning("fail to checkSat");
+    // }
   }
   return true;
 }

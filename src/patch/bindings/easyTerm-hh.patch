@@ -1,8 +1,8 @@
 20a21
-> #include "Python.h"
+> #include "smt_wrapper_interface.hh"
 186a188,194
 > 	RewriteSmtSequenceSearch* smtSearch2(SearchType type,
-> 			EasyTerm* target, PyObject* connector, PyObject* converter, 
+> 			EasyTerm* target, Connector* connector, Converter* converter, 
 >           bool fold = true, bool merge = false,
 > 			const Vector<ConditionFragment*> &condition = NO_CONDITION,
 > 			int depth = -1);

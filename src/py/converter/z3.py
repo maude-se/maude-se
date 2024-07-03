@@ -1,18 +1,18 @@
 from typing import Dict
-from ..interface import *
+from maudeSE.maude import PyConverter, SmtTerm
 from ..util import *
 from functools import reduce
-# from ..maude import *
 from maudeSE.maude import *
 
 import z3
 import re
 
 
-class Z3Converter(Converter):
+class Z3Converter(PyConverter):
     """A term converter from Maude to Z3"""
 
     def __init__(self):
+        PyConverter.__init__(self)
         self._g = id_gen()
         self._symbol_info = dict()
         self._symbol_map = dict()
@@ -183,7 +183,7 @@ class Z3Converter(Converter):
         return self._func_dict[key]
     
     def term2dag(self, term):
-        t, _, _ = term
+        t, _, _ = term.getData()
         return self._module.parseTerm(self._term2dag(t))
 
     def _term2dag(self, term):
@@ -288,7 +288,7 @@ class Z3Converter(Converter):
         :returns: A pair of an SMT solver term and its variables
         """
         term, v_set = self._dag2term(t)
-        return tuple([term, None, list(v_set)])
+        return SmtTerm([term, None, list(v_set)])
 
     def _dag2term(self, t: Term):
 
@@ -359,6 +359,13 @@ class Z3Converter(Converter):
 
             # remove parenthesis 
             val = val.replace("(", "").replace(")", "")
+
+            if val == "true":
+                val = True
+
+            if val == "false":
+                val = False
+
             c = self._const_dict[symbol](val)
             return tuple([c, set()])
 
